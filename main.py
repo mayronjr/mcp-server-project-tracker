@@ -7,7 +7,7 @@ from google.oauth2.service_account import Credentials
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
-from models import TaskStatus, TaskPriority
+from models import TaskStatus, TaskPriority, Task, TaskUpdate, BatchTaskUpdate, BatchTaskAdd
 
 # Configurar logging para stderr (nunca usar stdout em servidores MCP STDIO)
 logging.basicConfig(
@@ -90,63 +90,30 @@ def list_tasks() -> List[Dict]:
         return [{"error": f"Erro ao listar tarefas: {str(e)}"}]
 
 @server.tool("add_task")
-def add_task(
-    task_id: str,
-    contexto: str,
-    descricao: str,
-    prioridade: str,
-    status: str,
-    task_id_root: str = "",
-    sprint: str = "",
-    detalhado: str = "",
-    data_criacao: str = "",
-    data_solucao: str = ""
-) -> str:
+def add_task(task: Task) -> str:
     """
     Adiciona uma nova tarefa na planilha.
 
-    Colunas: Task ID, Task ID Root, Sprint, Contexto, Descrição, Detalhado,
-             Prioridade, Status, Data Criação, Data Solução
-
     Args:
-        task_id: ID único da tarefa (obrigatório)
-        contexto: Contexto da tarefa (obrigatório)
-        descricao: Descrição da tarefa (obrigatório)
-        prioridade: Prioridade (Baixa, Normal, Alta, Urgente)
-        status: Status da tarefa (Todo, Em Desenvolvimento, etc)
-        task_id_root: ID da tarefa raiz relacionada
-        sprint: Sprint associada
-        detalhado: Descrição detalhada
-        data_criacao: Data de criação
-        data_solucao: Data de solução
+        task: Objeto Task com todos os campos da tarefa
     """
-    # Validar prioridade
-    if prioridade not in [p.value for p in TaskPriority]:
-        error_msg = f"Erro: Prioridade '{prioridade}' inválida. Use: {', '.join([p.value for p in TaskPriority])}"
-        logger.warning(error_msg)
-        return error_msg
-
-    # Validar status
-    if status not in [s.value for s in TaskStatus]:
-        error_msg = f"Erro: Status '{status}' inválido. Use: {', '.join([s.value for s in TaskStatus])}"
-        logger.warning(error_msg)
-        return error_msg
-
     try:
-        logger.info(f"Adicionando tarefa '{task_id}'")
+        logger.info(f"Adicionando tarefa '{task.task_id}'")
         service = get_sheets_service()
         sheet = service.spreadsheets()
+
+        # Converter o modelo Pydantic para lista de valores
         values = [[
-            task_id,
-            task_id_root,
-            sprint,
-            contexto,
-            descricao,
-            detalhado,
-            prioridade,
-            status,
-            data_criacao,
-            data_solucao
+            task.task_id,
+            task.task_id_root,
+            task.sprint,
+            task.contexto,
+            task.descricao,
+            task.detalhado,
+            task.prioridade,  # Já é string devido ao use_enum_values
+            task.status,      # Já é string devido ao use_enum_values
+            task.data_criacao,
+            task.data_solucao
         ]]
         body = {"values": values}
         sheet.values().append(
@@ -155,7 +122,7 @@ def add_task(
             valueInputOption="RAW",
             body=body
         ).execute()
-        success_msg = f"Tarefa '{task_id}' adicionada com sucesso."
+        success_msg = f"Tarefa '{task.task_id}' adicionada com sucesso."
         logger.info(success_msg)
         return success_msg
     except Exception as e:
@@ -232,41 +199,12 @@ def update_task(task_id: str, updates: Dict) -> str:
         return error_msg
 
 @server.tool("batch_add_tasks")
-def batch_add_tasks(tasks: List[Dict]) -> Dict:
+def batch_add_tasks(tasks: List[Task]) -> Dict:
     """
     Adiciona múltiplas tarefas em uma única operação.
 
     Args:
-        tasks: Lista de dicionários, onde cada dicionário contém os campos da tarefa:
-               - task_id: ID único da tarefa (obrigatório)
-               - contexto: Contexto da tarefa (obrigatório)
-               - descricao: Descrição da tarefa (obrigatório)
-               - prioridade: Prioridade (obrigatório)
-               - status: Status da tarefa (obrigatório)
-               - task_id_root: ID da tarefa raiz relacionada (opcional)
-               - sprint: Sprint associada (opcional)
-               - detalhado: Descrição detalhada (opcional)
-               - data_criacao: Data de criação (opcional)
-               - data_solucao: Data de solução (opcional)
-
-    Exemplo:
-        tasks = [
-            {
-                "task_id": "TASK-001",
-                "contexto": "Backend",
-                "descricao": "Implementar API de usuários",
-                "prioridade": "Alta",
-                "status": "Todo"
-            },
-            {
-                "task_id": "TASK-002",
-                "contexto": "Frontend",
-                "descricao": "Criar tela de login",
-                "prioridade": "Normal",
-                "status": "Todo",
-                "sprint": "Sprint 1"
-            }
-        ]
+        tasks: Lista de objetos Task
 
     Returns:
         Dicionário com:
@@ -278,108 +216,35 @@ def batch_add_tasks(tasks: List[Dict]) -> Dict:
         logger.info(f"Iniciando adição em lote de {len(tasks)} tarefa(s)")
 
         results = []
-        success_count = 0
-        error_count = 0
         rows_to_add = []
 
-        # Validar e preparar cada tarefa
+        # Converter cada tarefa para lista de valores
         for task in tasks:
-            task_id = task.get("task_id")
-            contexto = task.get("contexto")
-            descricao = task.get("descricao")
-            prioridade = task.get("prioridade")
-            status = task.get("status")
-
-            # Validar campos obrigatórios
-            if not task_id:
-                error_count += 1
+            try:
+                row = [
+                    task.task_id,
+                    task.task_id_root,
+                    task.sprint,
+                    task.contexto,
+                    task.descricao,
+                    task.detalhado,
+                    task.prioridade,  # Já é string devido ao use_enum_values
+                    task.status,      # Já é string devido ao use_enum_values
+                    task.data_criacao,
+                    task.data_solucao
+                ]
+                rows_to_add.append(row)
                 results.append({
-                    "task_id": "unknown",
-                    "status": "error",
-                    "message": "task_id não fornecido"
+                    "task_id": task.task_id,
+                    "status": "success",
+                    "message": "Tarefa preparada para adição"
                 })
-                continue
-
-            if not contexto:
-                error_count += 1
+            except Exception as e:
                 results.append({
-                    "task_id": task_id,
+                    "task_id": getattr(task, 'task_id', 'unknown'),
                     "status": "error",
-                    "message": "contexto não fornecido"
+                    "message": f"Erro ao preparar tarefa: {str(e)}"
                 })
-                continue
-
-            if not descricao:
-                error_count += 1
-                results.append({
-                    "task_id": task_id,
-                    "status": "error",
-                    "message": "descricao não fornecida"
-                })
-                continue
-
-            if not prioridade:
-                error_count += 1
-                results.append({
-                    "task_id": task_id,
-                    "status": "error",
-                    "message": "prioridade não fornecida"
-                })
-                continue
-
-            if not status:
-                error_count += 1
-                results.append({
-                    "task_id": task_id,
-                    "status": "error",
-                    "message": "status não fornecido"
-                })
-                continue
-
-            # Validar prioridade
-            if prioridade not in [p.value for p in TaskPriority]:
-                error_msg = f"Prioridade '{prioridade}' inválida"
-                logger.warning(f"Tarefa '{task_id}': {error_msg}")
-                error_count += 1
-                results.append({
-                    "task_id": task_id,
-                    "status": "error",
-                    "message": error_msg
-                })
-                continue
-
-            # Validar status
-            if status not in [s.value for s in TaskStatus]:
-                error_msg = f"Status '{status}' inválido"
-                logger.warning(f"Tarefa '{task_id}': {error_msg}")
-                error_count += 1
-                results.append({
-                    "task_id": task_id,
-                    "status": "error",
-                    "message": error_msg
-                })
-                continue
-
-            # Preparar linha para adicionar
-            row = [
-                task_id,
-                task.get("task_id_root", ""),
-                task.get("sprint", ""),
-                contexto,
-                descricao,
-                task.get("detalhado", ""),
-                prioridade,
-                status,
-                task.get("data_criacao", ""),
-                task.get("data_solucao", "")
-            ]
-            rows_to_add.append(row)
-            success_count += 1
-            results.append({
-                "task_id": task_id,
-                "status": "success",
-                "message": "Tarefa preparada para adição"
-            })
 
         # Adicionar todas as tarefas válidas de uma vez
         if rows_to_add:
@@ -398,6 +263,9 @@ def batch_add_tasks(tasks: List[Dict]) -> Dict:
                 if result["status"] == "success":
                     result["message"] = "Tarefa adicionada com sucesso"
 
+        success_count = sum(1 for r in results if r["status"] == "success")
+        error_count = sum(1 for r in results if r["status"] == "error")
+
         summary = {
             "success_count": success_count,
             "error_count": error_count,
@@ -413,30 +281,16 @@ def batch_add_tasks(tasks: List[Dict]) -> Dict:
         return {
             "success_count": 0,
             "error_count": len(tasks),
-            "details": [{"task_id": t.get("task_id", "unknown"), "status": "error", "message": error_msg} for t in tasks]
+            "details": [{"task_id": getattr(t, 'task_id', 'unknown'), "status": "error", "message": error_msg} for t in tasks]
         }
 
 @server.tool("batch_update_tasks")
-def batch_update_tasks(updates: List[Dict]) -> Dict:
+def batch_update_tasks(updates: List[TaskUpdate]) -> Dict:
     """
     Atualiza múltiplas tarefas em uma única operação.
 
     Args:
-        updates: Lista de dicionários, onde cada dicionário contém:
-                 - task_id: ID da tarefa a atualizar (obrigatório)
-                 - fields: Dicionário com os campos a atualizar
-
-    Exemplo:
-        updates = [
-            {
-                "task_id": "TASK-001",
-                "fields": {"Status": "Em Desenvolvimento", "Prioridade": "Alta"}
-            },
-            {
-                "task_id": "TASK-002",
-                "fields": {"Status": "Concluído", "Data Solução": "2025-10-23"}
-            }
-        ]
+        updates: Lista de objetos TaskUpdate
 
     Returns:
         Dicionário com:
@@ -459,7 +313,7 @@ def batch_update_tasks(updates: List[Dict]) -> Dict:
             return {
                 "success_count": 0,
                 "error_count": len(updates),
-                "details": [{"task_id": u.get("task_id", "unknown"), "status": "error", "message": warning_msg} for u in updates]
+                "details": [{"task_id": getattr(u, 'task_id', 'unknown'), "status": "error", "message": warning_msg} for u in updates]
             }
 
         headers = values[0]
@@ -470,8 +324,8 @@ def batch_update_tasks(updates: List[Dict]) -> Dict:
 
         # Processar cada atualização
         for update_item in updates:
-            task_id = update_item.get("task_id")
-            fields = update_item.get("fields", {})
+            task_id = update_item.task_id
+            fields = update_item.fields
 
             if not task_id:
                 error_count += 1
@@ -566,7 +420,7 @@ def batch_update_tasks(updates: List[Dict]) -> Dict:
         return {
             "success_count": 0,
             "error_count": len(updates),
-            "details": [{"task_id": u.get("task_id", "unknown"), "status": "error", "message": error_msg} for u in updates]
+            "details": [{"task_id": getattr(u, 'task_id', 'unknown'), "status": "error", "message": error_msg} for u in updates]
         }
 
 @server.tool("get_valid_configs")
