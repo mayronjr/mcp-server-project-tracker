@@ -231,6 +231,344 @@ def update_task(task_id: str, updates: Dict) -> str:
         logger.error(error_msg)
         return error_msg
 
+@server.tool("batch_add_tasks")
+def batch_add_tasks(tasks: List[Dict]) -> Dict:
+    """
+    Adiciona múltiplas tarefas em uma única operação.
+
+    Args:
+        tasks: Lista de dicionários, onde cada dicionário contém os campos da tarefa:
+               - task_id: ID único da tarefa (obrigatório)
+               - contexto: Contexto da tarefa (obrigatório)
+               - descricao: Descrição da tarefa (obrigatório)
+               - prioridade: Prioridade (obrigatório)
+               - status: Status da tarefa (obrigatório)
+               - task_id_root: ID da tarefa raiz relacionada (opcional)
+               - sprint: Sprint associada (opcional)
+               - detalhado: Descrição detalhada (opcional)
+               - data_criacao: Data de criação (opcional)
+               - data_solucao: Data de solução (opcional)
+
+    Exemplo:
+        tasks = [
+            {
+                "task_id": "TASK-001",
+                "contexto": "Backend",
+                "descricao": "Implementar API de usuários",
+                "prioridade": "Alta",
+                "status": "Todo"
+            },
+            {
+                "task_id": "TASK-002",
+                "contexto": "Frontend",
+                "descricao": "Criar tela de login",
+                "prioridade": "Normal",
+                "status": "Todo",
+                "sprint": "Sprint 1"
+            }
+        ]
+
+    Returns:
+        Dicionário com:
+        - success_count: Número de tarefas adicionadas com sucesso
+        - error_count: Número de erros
+        - details: Lista com detalhes de cada adição
+    """
+    try:
+        logger.info(f"Iniciando adição em lote de {len(tasks)} tarefa(s)")
+
+        results = []
+        success_count = 0
+        error_count = 0
+        rows_to_add = []
+
+        # Validar e preparar cada tarefa
+        for task in tasks:
+            task_id = task.get("task_id")
+            contexto = task.get("contexto")
+            descricao = task.get("descricao")
+            prioridade = task.get("prioridade")
+            status = task.get("status")
+
+            # Validar campos obrigatórios
+            if not task_id:
+                error_count += 1
+                results.append({
+                    "task_id": "unknown",
+                    "status": "error",
+                    "message": "task_id não fornecido"
+                })
+                continue
+
+            if not contexto:
+                error_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "error",
+                    "message": "contexto não fornecido"
+                })
+                continue
+
+            if not descricao:
+                error_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "error",
+                    "message": "descricao não fornecida"
+                })
+                continue
+
+            if not prioridade:
+                error_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "error",
+                    "message": "prioridade não fornecida"
+                })
+                continue
+
+            if not status:
+                error_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "error",
+                    "message": "status não fornecido"
+                })
+                continue
+
+            # Validar prioridade
+            if prioridade not in [p.value for p in TaskPriority]:
+                error_msg = f"Prioridade '{prioridade}' inválida"
+                logger.warning(f"Tarefa '{task_id}': {error_msg}")
+                error_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "error",
+                    "message": error_msg
+                })
+                continue
+
+            # Validar status
+            if status not in [s.value for s in TaskStatus]:
+                error_msg = f"Status '{status}' inválido"
+                logger.warning(f"Tarefa '{task_id}': {error_msg}")
+                error_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "error",
+                    "message": error_msg
+                })
+                continue
+
+            # Preparar linha para adicionar
+            row = [
+                task_id,
+                task.get("task_id_root", ""),
+                task.get("sprint", ""),
+                contexto,
+                descricao,
+                task.get("detalhado", ""),
+                prioridade,
+                status,
+                task.get("data_criacao", ""),
+                task.get("data_solucao", "")
+            ]
+            rows_to_add.append(row)
+            success_count += 1
+            results.append({
+                "task_id": task_id,
+                "status": "success",
+                "message": "Tarefa preparada para adição"
+            })
+
+        # Adicionar todas as tarefas válidas de uma vez
+        if rows_to_add:
+            service = get_sheets_service()
+            sheet = service.spreadsheets()
+            body = {"values": rows_to_add}
+            sheet.values().append(
+                spreadsheetId=SPREADSHEET_ID,
+                range=RANGE_NAME,
+                valueInputOption="RAW",
+                body=body
+            ).execute()
+
+            # Atualizar mensagens de sucesso
+            for result in results:
+                if result["status"] == "success":
+                    result["message"] = "Tarefa adicionada com sucesso"
+
+        summary = {
+            "success_count": success_count,
+            "error_count": error_count,
+            "details": results
+        }
+
+        logger.info(f"Adição em lote concluída: {success_count} sucesso(s), {error_count} erro(s)")
+        return summary
+
+    except Exception as e:
+        error_msg = f"Erro ao executar adição em lote: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success_count": 0,
+            "error_count": len(tasks),
+            "details": [{"task_id": t.get("task_id", "unknown"), "status": "error", "message": error_msg} for t in tasks]
+        }
+
+@server.tool("batch_update_tasks")
+def batch_update_tasks(updates: List[Dict]) -> Dict:
+    """
+    Atualiza múltiplas tarefas em uma única operação.
+
+    Args:
+        updates: Lista de dicionários, onde cada dicionário contém:
+                 - task_id: ID da tarefa a atualizar (obrigatório)
+                 - fields: Dicionário com os campos a atualizar
+
+    Exemplo:
+        updates = [
+            {
+                "task_id": "TASK-001",
+                "fields": {"Status": "Em Desenvolvimento", "Prioridade": "Alta"}
+            },
+            {
+                "task_id": "TASK-002",
+                "fields": {"Status": "Concluído", "Data Solução": "2025-10-23"}
+            }
+        ]
+
+    Returns:
+        Dicionário com:
+        - success_count: Número de tarefas atualizadas com sucesso
+        - error_count: Número de erros
+        - details: Lista com detalhes de cada atualização
+    """
+    try:
+        logger.info(f"Iniciando atualização em lote de {len(updates)} tarefa(s)")
+        service = get_sheets_service()
+        sheet = service.spreadsheets()
+
+        # Buscar todas as tarefas uma vez
+        result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=RANGE_NAME).execute()
+        values = result.get("values", [])
+
+        if not values or len(values) < 2:
+            warning_msg = "Nenhuma tarefa encontrada na planilha."
+            logger.warning(warning_msg)
+            return {
+                "success_count": 0,
+                "error_count": len(updates),
+                "details": [{"task_id": u.get("task_id", "unknown"), "status": "error", "message": warning_msg} for u in updates]
+            }
+
+        headers = values[0]
+        results = []
+        success_count = 0
+        error_count = 0
+        batch_data = []
+
+        # Processar cada atualização
+        for update_item in updates:
+            task_id = update_item.get("task_id")
+            fields = update_item.get("fields", {})
+
+            if not task_id:
+                error_count += 1
+                results.append({
+                    "task_id": "unknown",
+                    "status": "error",
+                    "message": "task_id não fornecido"
+                })
+                continue
+
+            # Validar status se estiver sendo atualizado
+            if "Status" in fields and fields["Status"] not in [s.value for s in TaskStatus]:
+                error_msg = f"Status '{fields['Status']}' inválido"
+                logger.warning(f"Tarefa '{task_id}': {error_msg}")
+                error_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "error",
+                    "message": error_msg
+                })
+                continue
+
+            # Validar prioridade se estiver sendo atualizada
+            if "Prioridade" in fields and fields["Prioridade"] not in [p.value for p in TaskPriority]:
+                error_msg = f"Prioridade '{fields['Prioridade']}' inválida"
+                logger.warning(f"Tarefa '{task_id}': {error_msg}")
+                error_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "error",
+                    "message": error_msg
+                })
+                continue
+
+            # Encontrar a tarefa
+            task_found = False
+            for i, row in enumerate(values[1:], start=2):
+                if len(row) > 0 and row[0] == task_id:
+                    task_found = True
+                    # Atualizar campos
+                    for key, value in fields.items():
+                        if key in headers:
+                            idx = headers.index(key)
+                            while len(row) <= idx:
+                                row.append("")
+                            row[idx] = value
+
+                    # Adicionar ao batch
+                    batch_data.append({
+                        "range": f"{SHEET_NAME}!A{i}:J{i}",
+                        "values": [row]
+                    })
+                    success_count += 1
+                    results.append({
+                        "task_id": task_id,
+                        "status": "success",
+                        "message": f"Tarefa atualizada com sucesso"
+                    })
+                    break
+
+            if not task_found:
+                error_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "error",
+                    "message": "Tarefa não encontrada"
+                })
+
+        # Executar atualização em lote usando batchUpdate
+        if batch_data:
+            batch_body = {
+                "valueInputOption": "RAW",
+                "data": batch_data
+            }
+            sheet.values().batchUpdate(
+                spreadsheetId=SPREADSHEET_ID,
+                body=batch_body
+            ).execute()
+
+        summary = {
+            "success_count": success_count,
+            "error_count": error_count,
+            "details": results
+        }
+
+        logger.info(f"Atualização em lote concluída: {success_count} sucesso(s), {error_count} erro(s)")
+        return summary
+
+    except Exception as e:
+        error_msg = f"Erro ao executar atualização em lote: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success_count": 0,
+            "error_count": len(updates),
+            "details": [{"task_id": u.get("task_id", "unknown"), "status": "error", "message": error_msg} for u in updates]
+        }
+
 @server.tool("get_valid_configs")
 def get_valid_configs() -> Dict[str, List[str]]:
     """
@@ -248,4 +586,28 @@ def get_valid_configs() -> Dict[str, List[str]]:
     }
 
 if __name__ == "__main__":
+    logger.info("=" * 60)
+    logger.info("Iniciando servidor MCP: kanban-sheets")
+    logger.info(f"Planilha ID: {SPREADSHEET_ID}")
+    logger.info(f"Aba: {SHEET_NAME}")
+    logger.info("Protocolo: STDIO (Standard Input/Output)")
+    logger.info("")
+    logger.info("Para conectar este servidor MCP, adicione no seu cliente MCP:")
+    logger.info("  {")
+    logger.info('    "mcpServers": {')
+    logger.info('      "kanban-sheets": {')
+    logger.info('        "command": "uv",')
+    logger.info('        "args": ["run", "main.py"]')
+    logger.info("      }")
+    logger.info("    }")
+    logger.info("  }")
+    logger.info("")
+    logger.info("Ferramentas disponíveis:")
+    logger.info("  - list_tasks: Lista todas as tarefas")
+    logger.info("  - add_task: Adiciona uma nova tarefa")
+    logger.info("  - update_task: Atualiza uma tarefa existente")
+    logger.info("  - batch_add_tasks: Adiciona múltiplas tarefas em lote")
+    logger.info("  - batch_update_tasks: Atualiza múltiplas tarefas em lote")
+    logger.info("  - get_valid_configs: Retorna configurações válidas")
+    logger.info("=" * 60)
     server.run()
