@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kanban": {
+      "command": "python",
+      "args": ["C:/Projetos/mcp-server-sheets/main.py"]
+    }
+  }
+}
