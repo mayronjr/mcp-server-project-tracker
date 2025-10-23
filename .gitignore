@@ -1,3 +1,75 @@
+# Arquivos de ambiente
 .env
-
+*.env
 credentials.json
+
+# Virtual environments
+venv/
+.venv/
+__pypackages__/  # caso use PEP 582 (UV-like)
+
+# Python cache
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.so
+
+# Logs
+*.log
+*.out
+*.err
+
+# Editor e IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Distribuição e build
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+*.whl
+
+# Cache do pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Coverage e testes
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# MyPy
+.mypy_cache/
+
+# Pyright / Type checking
+.pyright/
+
+# Poetry
+poetry.lock
+
+# Hatch
+.hatch/
+
+# UV / PEP 582 packages
+__pypackages__/
