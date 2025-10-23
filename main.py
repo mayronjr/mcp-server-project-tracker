@@ -2,17 +2,20 @@ import os
 from typing import List, Dict
 from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
-from mcp import MCPServer
+from mcp.server.fastmcp import FastMCP
+from dotenv import load_dotenv
+
+load_dotenv('.env')
 
 # Configuração: variável de ambiente com o ID da planilha
 SPREADSHEET_ID = os.getenv("KANBAN_SHEET_ID")
-RANGE_NAME = "Sheet1!A:E"  # Ajuste se sua aba tiver outro nome
+RANGE_NAME = "Back-End!A:G"  # Ajuste se sua aba tiver outro nome
 
 if not SPREADSHEET_ID:
     raise EnvironmentError("Defina a variável de ambiente KANBAN_SHEET_ID com o ID da planilha.")
 
 # Inicializa o MCP server
-server = MCPServer("kanban-sheets")
+server = FastMCP("kanban-sheets")
 
 # Autenticação via Service Account (arquivo credentials.json)
 def get_sheets_service():
@@ -22,7 +25,7 @@ def get_sheets_service():
     )
     return build("sheets", "v4", credentials=creds)
 
-@server.command("list_tasks")
+@server.tool("list_tasks")
 def list_tasks() -> List[Dict]:
     """Lista todas as tarefas na planilha."""
     service = get_sheets_service()
@@ -36,7 +39,7 @@ def list_tasks() -> List[Dict]:
     tasks = [dict(zip(headers, row)) for row in values[1:]]
     return tasks
 
-@server.command("add_task")
+@server.tool("add_task")
 def add_task(task: Dict) -> str:
     """Adiciona uma nova tarefa."""
     service = get_sheets_service()
@@ -57,7 +60,7 @@ def add_task(task: Dict) -> str:
     ).execute()
     return f"Tarefa {task.get('ID', '(sem ID)')} adicionada com sucesso."
 
-@server.command("update_task")
+@server.tool("update_task")
 def update_task(task_id: str, updates: Dict) -> str:
     """Atualiza uma tarefa existente."""
     service = get_sheets_service()
