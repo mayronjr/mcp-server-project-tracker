@@ -5,6 +5,8 @@ from google.oauth2.service_account import Credentials
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
+from models import TaskStatus, TaskPriority
+
 load_dotenv('.env')
 
 # Configuração: variável de ambiente com o ID da planilha
@@ -86,6 +88,15 @@ def update_task(task_id: str, updates: Dict) -> str:
             return f"Tarefa {task_id} atualizada com sucesso."
 
     return f"Tarefa {task_id} não encontrada."
+
+@server.resource("config://settings")
+# @server.tool("get_valid_statuses")
+def get_valid_configs() -> Dict[str, List[str]]:
+    """Retorna todos os status válidos usando Enum."""
+    return {
+        'valid_task_status': [status.value for status in TaskStatus],
+        'valid_task_priorities': [priority.value for priority in TaskPriority]
+    }
 
 if __name__ == "__main__":
     server.run()
