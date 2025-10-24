@@ -411,20 +411,21 @@ Adicione ao seu cliente MCP:
 
 ## Estrutura da Planilha
 
-A planilha deve ter as seguintes colunas (A até J):
+A planilha deve ter as seguintes colunas (A até K):
 
 | Coluna | Nome           | Descrição                  |
 |--------|----------------|----------------------------|
-| A      | Task ID        | ID único da tarefa         |
-| B      | Task ID Root   | ID da tarefa raiz          |
-| C      | Sprint         | Sprint associada           |
-| D      | Contexto       | Contexto da tarefa         |
-| E      | Descrição      | Descrição breve            |
-| F      | Detalhado      | Descrição detalhada        |
-| G      | Prioridade     | Prioridade da tarefa       |
-| H      | Status         | Status atual               |
-| I      | Data Criação   | Data de criação            |
-| J      | Data Solução   | Data de solução            |
+| A      | Projeto        | Nome do Projeto            |
+| B      | Task ID        | ID único da tarefa         |
+| C      | Task ID Root   | ID da tarefa raiz          |
+| D      | Sprint         | Sprint associada           |
+| E      | Contexto       | Contexto da tarefa         |
+| F      | Descrição      | Descrição breve            |
+| G      | Detalhado      | Descrição detalhada        |
+| H      | Prioridade     | Prioridade da tarefa       |
+| I      | Status         | Status atual               |
+| J      | Data Criação   | Data de criação            |
+| K      | Data Solução   | Data de solução            |
 
 ---
 
@@ -483,6 +484,128 @@ A planilha deve ter as seguintes colunas (A até J):
 - **Pydantic**: Validação de dados (v2.12.3)
 - **Google API Python Client**: Integração com Google Sheets
 - **google-auth**: Autenticação com Google Cloud
+
+---
+
+## Testes
+
+O projeto inclui uma suíte completa de testes usando pytest.
+
+### Estrutura de Testes
+
+```
+tests/
+├── __init__.py
+├── conftest.py              # Fixtures compartilhadas
+├── test_list_tasks.py       # Testes para listagem e busca
+├── test_add_task.py         # Testes para adição de tarefas
+├── test_update_task.py      # Testes para atualização
+└── test_batch_operations.py # Testes para operações em lote
+```
+
+### Instalação das Dependências de Teste
+
+```bash
+# Instalar dependências de desenvolvimento
+uv pip install -r requirements-dev.txt
+```
+
+As dependências incluem:
+- `pytest`: Framework de testes
+- `pytest-asyncio`: Suporte para testes assíncronos
+- `pytest-cov`: Cobertura de código
+- `pytest-mock`: Mocking facilitado
+
+### Executar Testes
+
+```bash
+# Executar todos os testes
+uv run pytest
+
+# Executar com cobertura de código
+uv run pytest --cov
+
+# Executar testes específicos
+uv run pytest tests/test_list_tasks.py
+
+# Executar testes com saída verbosa
+uv run pytest -v
+
+# Executar apenas testes de uma função específica
+uv run pytest tests/test_list_tasks.py::test_list_tasks_all
+
+# Gerar relatório de cobertura em HTML
+uv run pytest --cov --cov-report=html
+# O relatório será criado em htmlcov/index.html
+```
+
+### Estrutura dos Testes
+
+Os testes utilizam mocks do Google Sheets API para não depender de conexões reais. As principais fixtures incluem:
+
+- `mock_env_vars`: Variáveis de ambiente mockadas
+- `mock_sheets_service`: Mock do serviço Google Sheets
+- `mock_credentials`: Mock das credenciais do Google
+- `sample_sheet_data`: Dados de exemplo para testes
+- `empty_sheet_data`: Dados de planilha vazia
+
+### Cobertura de Testes
+
+Os testes cobrem:
+
+1. **list_tasks**:
+   - Listagem sem filtros
+   - Filtros individuais (prioridade, status, contexto, etc.)
+   - Múltiplos filtros combinados
+   - Paginação
+   - Casos de erro
+
+2. **add_task**:
+   - Adição com todos os campos
+   - Adição com campos mínimos
+   - Diferentes prioridades e status
+   - Validação de campos
+   - Tratamento de erros
+
+3. **update_task**:
+   - Atualização de campos individuais
+   - Atualização de múltiplos campos
+   - Validação de status e prioridade
+   - Tarefa não encontrada
+   - Tratamento de erros
+
+4. **batch_add_tasks e batch_update_tasks**:
+   - Operações em lote bem-sucedidas
+   - Operações parcialmente bem-sucedidas
+   - Validações em lote
+   - Tratamento de erros
+
+5. **get_valid_configs**:
+   - Retorno de configurações válidas
+   - Estrutura do retorno
+
+### Exemplo de Teste
+
+```python
+def test_list_tasks_with_priority_filter(mock_env_vars, mock_credentials_file,
+                                         mock_credentials, mock_get_sheets_service):
+    """Testa filtro por prioridade."""
+    filters = SearchFilters(prioridade=["Alta"])
+    result = list_tasks(filters=filters)
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert result[0]["Task ID"] == "TASK-001"
+    assert result[0]["Prioridade"] == "Alta"
+```
+
+### Configuração do pytest
+
+O arquivo [pytest.ini](pytest.ini) contém as configurações padrão, incluindo:
+- Padrões de descoberta de testes
+- Opções de saída
+- Configuração de cobertura de código
+- Marcadores customizados
 
 ---
 
