@@ -32,7 +32,7 @@ load_dotenv('.env')
 # Configuração: variáveis de ambiente
 SPREADSHEET_ID = os.getenv("KANBAN_SHEET_ID")
 SHEET_NAME = os.getenv("KANBAN_SHEET_NAME", "Back-End")  # Nome da aba, padrão "Back-End"
-RANGE_NAME = f"{SHEET_NAME}!A:J"
+RANGE_NAME = f"{SHEET_NAME}!A:K"
 
 if not SPREADSHEET_ID:
     raise EnvironmentError("Defina a variável de ambiente KANBAN_SHEET_ID com o ID da planilha.")
@@ -274,6 +274,7 @@ def add_task(task: Task) -> str:
 
         # Converter o modelo Pydantic para lista de valores
         values = [[
+            task.project,
             task.task_id,
             task.task_id_root,
             task.sprint,
@@ -351,7 +352,7 @@ def update_task(task_id: str, updates: Dict) -> str:
 
                 sheet.values().update(
                     spreadsheetId=SPREADSHEET_ID,
-                    range=f"{SHEET_NAME}!A{i}:J{i}",
+                    range=f"{SHEET_NAME}!A{i}:K{i}",
                     valueInputOption="RAW",
                     body={"values": [row]}
                 ).execute()
@@ -393,6 +394,7 @@ def batch_add_tasks(batch: BatchTaskAdd) -> Dict:
         for task in tasks:
             try:
                 row = [
+                    task.project,
                     task.task_id,
                     task.task_id_root,
                     task.sprint,
@@ -548,7 +550,7 @@ def batch_update_tasks(batch: BatchTaskUpdate) -> Dict:
 
                     # Adicionar ao batch
                     batch_data.append({
-                        "range": f"{SHEET_NAME}!A{i}:J{i}",
+                        "range": f"{SHEET_NAME}!A{i}:K{i}",
                         "values": [row]
                     })
                     success_count += 1
