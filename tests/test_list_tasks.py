@@ -2,6 +2,7 @@
 Testes para a ferramenta list_tasks do servidor MCP.
 """
 import pytest
+from unittest.mock import patch
 from main import list_tasks
 from models import SearchFilters, PaginationParams
 
@@ -21,7 +22,7 @@ def test_list_tasks_all(mock_env_vars, mock_credentials_file, mock_credentials,
 def test_list_tasks_with_priority_filter(mock_env_vars, mock_credentials_file,
                                          mock_credentials, mock_get_sheets_service):
     """Testa filtro por prioridade."""
-    filters = SearchFilters(prioridade=["Alta"])
+    filters = SearchFilters(prioridade=["Alta"]) # type: ignore
     result = list_tasks(filters=filters)
 
     assert isinstance(result, list)
@@ -33,7 +34,7 @@ def test_list_tasks_with_priority_filter(mock_env_vars, mock_credentials_file,
 def test_list_tasks_with_status_filter(mock_env_vars, mock_credentials_file,
                                        mock_credentials, mock_get_sheets_service):
     """Testa filtro por status."""
-    filters = SearchFilters(status=["Todo"])
+    filters = SearchFilters(status=["Todo"]) # type: ignore
     result = list_tasks(filters=filters)
 
     assert isinstance(result, list)
@@ -79,7 +80,7 @@ def test_list_tasks_with_multiple_filters(mock_env_vars, mock_credentials_file,
                                           mock_credentials, mock_get_sheets_service):
     """Testa combinação de múltiplos filtros."""
     filters = SearchFilters(
-        status=["Todo"],
+        status=["Todo"], # type: ignore
         contexto="Backend"
     )
     result = list_tasks(filters=filters)
@@ -149,7 +150,7 @@ def test_list_tasks_empty_sheet(mock_env_vars, mock_credentials_file,
     # Configurar mock para retornar planilha vazia
     mock_sheets_service.spreadsheets().values().get().execute.return_value = empty_sheet_data
 
-    with pytest.mock.patch('main.get_sheets_service', return_value=mock_sheets_service):
+    with patch('main.get_sheets_service', return_value=mock_sheets_service):
         result = list_tasks()
 
     assert isinstance(result, list)

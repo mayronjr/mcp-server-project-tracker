@@ -19,14 +19,14 @@ def sample_sheet_data():
     return {
         "values": [
             # Cabeçalho
-            ["Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
+            ["Projeto", "Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
              "Detalhado", "Prioridade", "Status", "Data Criação", "Data Solução"],
             # Tarefas de exemplo
-            ["TASK-001", "TASK-001", "Sprint 1", "Backend", "Implementar API",
+            ["TestProject", "TASK-001", "TASK-001", "Sprint 1", "Backend", "Implementar API",
              "Criar endpoints REST", "Alta", "Em Desenvolvimento", "2025-10-20", ""],
-            ["TASK-002", "TASK-002", "Sprint 1", "Frontend", "Criar interface",
+            ["TestProject", "TASK-002", "TASK-002", "Sprint 1", "Frontend", "Criar interface",
              "Interface do usuário", "Normal", "Todo", "2025-10-21", ""],
-            ["TASK-003", "TASK-001", "Sprint 2", "Backend", "Adicionar testes",
+            ["TestProject", "TASK-003", "TASK-001", "Sprint 2", "Backend", "Adicionar testes",
              "Testes unitários e integração", "Urgente", "Todo", "2025-10-22", ""],
         ]
     }
@@ -37,7 +37,7 @@ def empty_sheet_data():
     """Dados de uma planilha vazia (apenas cabeçalho)."""
     return {
         "values": [
-            ["Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
+            ["Projeto", "Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
              "Detalhado", "Prioridade", "Status", "Data Criação", "Data Solução"]
         ]
     }
@@ -91,7 +91,9 @@ def mock_sheets_service(sample_sheet_data):
 def mock_credentials():
     """Mock das credenciais do Google."""
     with patch('main.Credentials.from_service_account_file') as mock_creds:
-        mock_creds.return_value = Mock()
+        mock_instance = Mock()
+        mock_instance.universe_domain = "googleapis.com"
+        mock_creds.return_value = mock_instance
         yield mock_creds
 
 
@@ -123,6 +125,7 @@ def mock_get_sheets_service(mock_sheets_service):
 def sample_task_data():
     """Dados de exemplo de uma tarefa."""
     return {
+        "project": "TestProject",
         "task_id": "TASK-100",
         "task_id_root": "TASK-100",
         "sprint": "Sprint 3",

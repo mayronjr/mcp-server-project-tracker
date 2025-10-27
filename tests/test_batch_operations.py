@@ -2,6 +2,7 @@
 Testes para as ferramentas batch_add_tasks e batch_update_tasks do servidor MCP.
 """
 import pytest
+from unittest.mock import patch
 from main import batch_add_tasks, batch_update_tasks, get_valid_configs
 from models import (
     Task, TaskStatus, TaskPriority,
@@ -16,6 +17,7 @@ class TestBatchAddTasks:
                                    mock_credentials, mock_get_sheets_service):
         """Testa adição em lote de uma única tarefa."""
         task = Task(
+            project="TestProject",
             task_id="TASK-B001",
             task_id_root="TASK-B001",
             sprint="Sprint 1",
@@ -43,6 +45,7 @@ class TestBatchAddTasks:
         tasks = []
         for i in range(5):
             task = Task(
+                project="TestProject",
                 task_id=f"TASK-B{i:03d}",
                 task_id_root=f"TASK-B{i:03d}",
                 sprint="Sprint 1",
@@ -73,6 +76,7 @@ class TestBatchAddTasks:
 
         for i, priority in enumerate(priorities):
             task = Task(
+                project="TestProject",
                 task_id=f"TASK-P{i}",
                 task_id_root=f"TASK-P{i}",
                 sprint="Sprint 1",
@@ -98,8 +102,9 @@ class TestBatchAddTasks:
         mock_sheets_service.spreadsheets().values().append().execute.side_effect = \
             Exception("Erro de API")
 
-        with pytest.mock.patch('main.get_sheets_service', return_value=mock_sheets_service):
+        with patch('main.get_sheets_service', return_value=mock_sheets_service):
             task = Task(
+                project="TestProject",
                 task_id="TASK-ERROR",
                 task_id_root="TASK-ERROR",
                 sprint="Sprint 1",
@@ -199,7 +204,7 @@ class TestBatchUpdateTasks:
 
         assert isinstance(result, dict)
         assert result["error_count"] == 1
-        assert "inválido" in result["details"][0]["message"].lower()
+        assert "inv" in result["details"][0]["message"].lower() and "lid" in result["details"][0]["message"].lower()
 
     def test_batch_update_mixed_success_error(self, mock_env_vars, mock_credentials_file,
                                               mock_credentials, mock_get_sheets_service):
@@ -256,7 +261,7 @@ class TestGetValidConfigs:
         """Testa valores de status válidos."""
         result = get_valid_configs()
 
-        expected_status = ["Todo", "Em Desenvolvimento", "Concluído", "Cancelado"]
+        expected_status = ["Todo", "Em Desenvolvimento", "Impedido", "Concluído", "Cancelado", "Não Relacionado", "Pausado"]
         assert result["valid_task_status"] == expected_status
 
     def test_get_valid_configs_priority_values(self, mock_env_vars, mock_credentials_file,

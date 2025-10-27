@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is an MCP (Model Context Protocol) server for managing Kanban tasks using Google Sheets as a backend. The server provides tools to create, read, update, and filter tasks in a Google Sheets spreadsheet through the MCP protocol.
 
+## Code Style Guidelines
+
+### Import Standards
+- **AVOID lazy imports**: Always place imports at the top of the file
+- **DO NOT** use imports inside functions or methods unless absolutely necessary
+- Use explicit imports rather than importing entire modules when possible
+- Group imports in the standard order: standard library, third-party, local modules
+
 ## Development Commands
 
 ### Environment Setup

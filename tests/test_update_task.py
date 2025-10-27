@@ -2,6 +2,7 @@
 Testes para a ferramenta update_task do servidor MCP.
 """
 import pytest
+from unittest.mock import patch
 from main import update_task
 
 
@@ -148,7 +149,7 @@ def test_update_task_api_error(mock_env_vars, mock_credentials_file,
     mock_sheets_service.spreadsheets().values().get().execute.side_effect = \
         Exception("Erro de conexão com Google Sheets")
 
-    with pytest.mock.patch('main.get_sheets_service', return_value=mock_sheets_service):
+    with patch('main.get_sheets_service', return_value=mock_sheets_service):
         updates = {"Status": "Concluído"}
         result = update_task("TASK-001", updates)
 

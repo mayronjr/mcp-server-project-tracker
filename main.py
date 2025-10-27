@@ -342,7 +342,7 @@ def update_task(task_id: str, updates: Dict) -> str:
         headers = values[0]
 
         for i, row in enumerate(values[1:], start=2):  # linha real começa em 2
-            if len(row) > 0 and row[0] == task_id:
+            if len(row) > 1 and row[1] == task_id:
                 for key, value in updates.items():
                     if key in headers:
                         idx = headers.index(key)
@@ -535,10 +535,10 @@ def batch_update_tasks(batch: BatchTaskUpdate) -> Dict:
                 })
                 continue
 
-            # Encontrar a tarefa
+            # Encontrar a tarefa (Task ID está na coluna 1, não 0)
             task_found = False
             for i, row in enumerate(values[1:], start=2):
-                if len(row) > 0 and row[0] == task_id:
+                if len(row) > 1 and row[1] == task_id:
                     task_found = True
                     # Atualizar campos
                     for key, value in fields.items():

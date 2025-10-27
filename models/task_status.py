@@ -2,7 +2,7 @@ from enum import Enum
 
 class TaskStatus(str, Enum):
     TODO="Todo"
-    EM_PROGRESSO="Em Desenvolvimento"
+    EM_DESENVOLVIMENTO="Em Desenvolvimento"
     IMPEDIDO="Impedido"
     CONCLUIDO="Concluído"
     CANCELADO="Cancelado"

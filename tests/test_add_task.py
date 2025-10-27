@@ -2,6 +2,7 @@
 Testes para a ferramenta add_task do servidor MCP.
 """
 import pytest
+from unittest.mock import patch
 from main import add_task
 from models import Task, TaskStatus, TaskPriority
 
@@ -21,6 +22,7 @@ def test_add_task_with_all_fields(mock_env_vars, mock_credentials_file,
                                   mock_credentials, mock_get_sheets_service):
     """Testa adição de tarefa com todos os campos preenchidos."""
     task = Task(
+        project="TestProject",
         task_id="TASK-200",
         task_id_root="TASK-200",
         sprint="Sprint 5",
@@ -44,6 +46,7 @@ def test_add_task_minimal_fields(mock_env_vars, mock_credentials_file,
                                  mock_credentials, mock_get_sheets_service):
     """Testa adição de tarefa com campos mínimos obrigatórios."""
     task = Task(
+        project="TestProject",
         task_id="TASK-300",
         task_id_root="TASK-300",
         sprint="Sprint 1",
@@ -66,6 +69,7 @@ def test_add_task_with_subtask(mock_env_vars, mock_credentials_file,
                                mock_credentials, mock_get_sheets_service):
     """Testa adição de subtarefa (task_id_root diferente)."""
     task = Task(
+        project="TestProject",
         task_id="TASK-100-01",
         task_id_root="TASK-100",
         sprint="Sprint 2",
@@ -97,6 +101,7 @@ def test_add_task_with_different_priorities(mock_env_vars, mock_credentials_file
 
     for priority in priorities:
         task = Task(
+            project="TestProject",
             task_id=f"TASK-{priority.value}",
             task_id_root=f"TASK-{priority.value}",
             sprint="Sprint 1",
@@ -125,6 +130,7 @@ def test_add_task_with_different_status(mock_env_vars, mock_credentials_file,
 
     for status in statuses:
         task = Task(
+            project="TestProject",
             task_id=f"TASK-{status.value}",
             task_id_root=f"TASK-{status.value}",
             sprint="Sprint 1",
@@ -148,7 +154,7 @@ def test_add_task_api_error(mock_env_vars, mock_credentials_file,
     mock_sheets_service.spreadsheets().values().append().execute.side_effect = \
         Exception("Erro de conexão com Google Sheets")
 
-    with pytest.mock.patch('main.get_sheets_service', return_value=mock_sheets_service):
+    with patch('main.get_sheets_service', return_value=mock_sheets_service):
         task = Task(**sample_task_data)
         result = add_task(task)
 
@@ -160,6 +166,7 @@ def test_add_task_with_special_characters(mock_env_vars, mock_credentials_file,
                                           mock_credentials, mock_get_sheets_service):
     """Testa adição de tarefa com caracteres especiais."""
     task = Task(
+        project="TestProject",
         task_id="TASK-SPECIAL",
         task_id_root="TASK-SPECIAL",
         sprint="Sprint 1",

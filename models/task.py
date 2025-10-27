@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from .task_status import TaskStatus
 from .task_priority import TaskPriority
@@ -6,6 +6,8 @@ from .task_priority import TaskPriority
 
 class Task(BaseModel):
     """Modelo Pydantic para uma tarefa do Kanban"""
+    model_config = ConfigDict(use_enum_values=True)
+
     project: str = Field(..., description="Nome do Projeto da Atividade")
     task_id: str = Field(..., description="ID único da tarefa")
     contexto: str = Field(..., description="Contexto da tarefa")
@@ -17,9 +19,6 @@ class Task(BaseModel):
     detalhado: str = Field(default="", description="Descrição detalhada")
     data_criacao: str = Field(default="", description="Data de criação")
     data_solucao: str = Field(default="", description="Data de solução")
-
-    class Config:
-        use_enum_values = True  # Usa os valores das enums ao serializar
 
 
 class TaskUpdate(BaseModel):
@@ -43,6 +42,7 @@ class BatchTaskAdd(BaseModel):
 
 class SearchFilters(BaseModel):
     """Modelo Pydantic para filtros de busca de tarefas"""
+    model_config = ConfigDict(use_enum_values=True)
 
     prioridade: Optional[List[TaskPriority]] = Field(
         default=None,
@@ -72,9 +72,6 @@ class SearchFilters(BaseModel):
         default=None,
         description="Filtrar por Sprint"
     )
-
-    class Config:
-        use_enum_values = True
 
 
 class PaginationParams(BaseModel):
