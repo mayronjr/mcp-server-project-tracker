@@ -1,6 +1,5 @@
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, List
-from datetime import datetime
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Optional, List, Union
 from .task_status import TaskStatus
 from .task_priority import TaskPriority
 
@@ -18,18 +17,58 @@ class Task(BaseModel):
     task_id_root: str = Field(default="", description="ID da tarefa raiz relacionada")
     sprint: str = Field(default="", description="Sprint associada")
     detalhado: str = Field(default="", description="Descrição detalhada")
-    data_criacao: str = Field(
-        default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        description="Data de criação (gerada automaticamente)"
-    )
-    data_solucao: str = Field(default="", description="Data de solução")
+
+
+class TaskUpdateFields(BaseModel):
+    """Modelo Pydantic para os campos que podem ser atualizados em uma tarefa"""
+    model_config = ConfigDict(use_enum_values=True)
+
+    task_id_root: Optional[str] = Field(default=None, description="ID da tarefa raiz relacionada")
+    sprint: Optional[str] = Field(default=None, description="Sprint associada")
+    contexto: Optional[str] = Field(default=None, description="Contexto da tarefa")
+    descricao: Optional[str] = Field(default=None, description="Descrição da tarefa")
+    detalhado: Optional[str] = Field(default=None, description="Descrição detalhada")
+    prioridade: Optional[Union[TaskPriority, str]] = Field(default=None, description="Prioridade da tarefa")
+    status: Optional[Union[TaskStatus, str]] = Field(default=None, description="Status atual da tarefa")
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def validate_status(cls, v):
+        """Valida e converte strings para TaskStatus"""
+        if v is None or isinstance(v, TaskStatus):
+            return v
+        if isinstance(v, str):
+            # Tentar encontrar o enum pelo valor
+            for status in TaskStatus:
+                if status.value == v:
+                    return status
+            # Se não encontrar, lançar erro de validação
+            valid_values = ', '.join([s.value for s in TaskStatus])
+            raise ValueError(f"Status '{v}' inválido. Use: {valid_values}")
+        return v
+
+    @field_validator('prioridade', mode='before')
+    @classmethod
+    def validate_prioridade(cls, v):
+        """Valida e converte strings para TaskPriority"""
+        if v is None or isinstance(v, TaskPriority):
+            return v
+        if isinstance(v, str):
+            # Tentar encontrar o enum pelo valor
+            for priority in TaskPriority:
+                if priority.value == v:
+                    return priority
+            # Se não encontrar, lançar erro de validação
+            valid_values = ', '.join([p.value for p in TaskPriority])
+            raise ValueError(f"Prioridade '{v}' inválida. Use: {valid_values}")
+        return v
 
 
 class TaskUpdate(BaseModel):
     """Modelo Pydantic para atualização de uma tarefa"""
 
     task_id: str = Field(..., description="ID da tarefa a ser atualizada")
-    fields: dict = Field(..., description="Campos a serem atualizados")
+    fields: TaskUpdateFields = Field(..., description="Campos a serem atualizados")
 
 
 class BatchTaskUpdate(BaseModel):
@@ -111,10 +150,4 @@ class PaginatedResponse(BaseModel):
     )
     total_pages: int = Field(
         description="Total de páginas disponíveis"
-    )
-    has_next: bool = Field(
-        description="Indica se existe próxima página"
-    )
-    has_previous: bool = Field(
-        description="Indica se existe página anterior"
     )

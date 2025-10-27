@@ -3,6 +3,7 @@ import sys
 import logging
 import math
 from typing import List, Dict, Optional, Union
+from datetime import datetime
 from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
 from mcp.server.fastmcp import FastMCP
@@ -12,6 +13,7 @@ from models import (
     TaskStatus,
     TaskPriority,
     Task,
+    TaskUpdateFields,
     BatchTaskUpdate,
     BatchTaskAdd,
     SearchFilters,
@@ -145,9 +147,7 @@ def list_tasks(
                     total_count=0,
                     page=pagination.page,
                     page_size=pagination.page_size,
-                    total_pages=0,
-                    has_next=False,
-                    has_previous=False
+                    total_pages=0
                 ).model_dump()
             # Senão, retornar lista vazia (comportamento legado)
             return []
@@ -230,9 +230,7 @@ def list_tasks(
             total_count=total_count,
             page=current_page,
             page_size=pagination.page_size,
-            total_pages=total_pages,
-            has_next=current_page < total_pages,
-            has_previous=current_page > 1
+            total_pages=total_pages
         )
 
         logger.info(
@@ -272,6 +270,9 @@ def add_task(task: Task) -> str:
         service = get_sheets_service()
         sheet = service.spreadsheets()
 
+        # Gerar data_criacao automaticamente
+        data_criacao = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         # Converter o modelo Pydantic para lista de valores
         values = [[
             task.project,
@@ -283,7 +284,8 @@ def add_task(task: Task) -> str:
             task.detalhado,
             task.prioridade,  # Já é string devido ao use_enum_values
             task.status,      # Já é string devido ao use_enum_values
-            task.data_criacao
+            data_criacao,
+            ""  # data_solucao vazia por padrão
         ]]
         body = {"values": values}
         sheet.values().append(
@@ -301,33 +303,52 @@ def add_task(task: Task) -> str:
         return error_msg
 
 @server.tool("update_task")
-def update_task(task_id: str, updates: Dict) -> str:
+def update_task(task_id: str, updates: TaskUpdateFields) -> str:
     """
     Atualiza uma tarefa existente pelo Task ID.
 
     Args:
         task_id: ID da tarefa a ser atualizada
-        updates: Dicionário com os campos a atualizar.
-                 Campos válidos: Task ID Root, Sprint, Contexto, Descrição,
-                 Detalhado, Prioridade, Status, Data Criação, Data Solução
+        updates: Objeto TaskUpdateFields com os campos a atualizar.
+                 Campos válidos: task_id_root, sprint, contexto, descricao,
+                 detalhado, prioridade, status
 
     Exemplo:
-        updates = {"Status": "Concluído", "Data Solução": "2025-10-23"}
+        updates = TaskUpdateFields(status="Concluído")
+
+    Nota: data_solucao é automaticamente definida quando o status é alterado
+          para "Concluído", "Cancelado" ou "Não Relacionado"
     """
-    # Validar se status está sendo atualizado
-    if "Status" in updates and updates["Status"] not in [s.value for s in TaskStatus]:
-        error_msg = f"Erro: Status '{updates['Status']}' inválido. Use: {', '.join([s.value for s in TaskStatus])}"
+    # Mapeamento de campos Python para nomes de colunas do Google Sheets
+    field_to_header = {
+        "task_id_root": "Task ID Root",
+        "sprint": "Sprint",
+        "contexto": "Contexto",
+        "descricao": "Descrição",
+        "detalhado": "Detalhado",
+        "prioridade": "Prioridade",
+        "status": "Status"
+    }
+
+    # Converter o modelo Pydantic para dict, excluindo valores None
+    updates_dict = updates.model_dump(exclude_none=True)
+
+    if not updates_dict:
+        error_msg = "Erro: Nenhum campo para atualizar foi fornecido."
         logger.warning(error_msg)
         return error_msg
 
-    # Validar se prioridade está sendo atualizada
-    if "Prioridade" in updates and updates["Prioridade"] not in [p.value for p in TaskPriority]:
-        error_msg = f"Erro: Prioridade '{updates['Prioridade']}' inválida. Use: {', '.join([p.value for p in TaskPriority])}"
-        logger.warning(error_msg)
-        return error_msg
+    # Converter para formato de headers do Google Sheets
+    sheet_updates = {field_to_header[k]: v for k, v in updates_dict.items() if k in field_to_header}
+
+    # Verificar se o status está sendo alterado para um estado final
+    final_statuses = [TaskStatus.CONCLUIDO.value, TaskStatus.CANCELADO.value, TaskStatus.NAO_RELACIONADO.value]
+    if updates.status and updates.status in final_statuses:
+        # Adicionar data_solucao automaticamente
+        sheet_updates["Data Solução"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
-        logger.info(f"Atualizando tarefa '{task_id}' com {len(updates)} campo(s)")
+        logger.info(f"Atualizando tarefa '{task_id}' com {len(sheet_updates)} campo(s)")
         service = get_sheets_service()
         sheet = service.spreadsheets()
         result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=RANGE_NAME).execute()
@@ -342,7 +363,7 @@ def update_task(task_id: str, updates: Dict) -> str:
 
         for i, row in enumerate(values[1:], start=2):  # linha real começa em 2
             if len(row) > 1 and row[1] == task_id:
-                for key, value in updates.items():
+                for key, value in sheet_updates.items():
                     if key in headers:
                         idx = headers.index(key)
                         while len(row) <= idx:
@@ -392,6 +413,9 @@ def batch_add_tasks(batch: BatchTaskAdd) -> Dict:
         # Converter cada tarefa para lista de valores
         for task in tasks:
             try:
+                # Gerar data_criacao automaticamente
+                data_criacao = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
                 row = [
                     task.project,
                     task.task_id,
@@ -402,8 +426,8 @@ def batch_add_tasks(batch: BatchTaskAdd) -> Dict:
                     task.detalhado,
                     task.prioridade,  # Já é string devido ao use_enum_values
                     task.status,      # Já é string devido ao use_enum_values
-                    task.data_criacao,
-                    task.data_solucao
+                    data_criacao,
+                    ""  # data_solucao vazia por padrão
                 ]
                 rows_to_add.append(row)
                 results.append({
@@ -496,6 +520,17 @@ def batch_update_tasks(batch: BatchTaskUpdate) -> Dict:
         error_count = 0
         batch_data = []
 
+        # Mapeamento de campos Python para nomes de colunas do Google Sheets
+        field_to_header = {
+            "task_id_root": "Task ID Root",
+            "sprint": "Sprint",
+            "contexto": "Contexto",
+            "descricao": "Descrição",
+            "detalhado": "Detalhado",
+            "prioridade": "Prioridade",
+            "status": "Status"
+        }
+
         # Processar cada atualização
         for update_item in updates:
             task_id = update_item.task_id
@@ -510,29 +545,26 @@ def batch_update_tasks(batch: BatchTaskUpdate) -> Dict:
                 })
                 continue
 
-            # Validar status se estiver sendo atualizado
-            if "Status" in fields and fields["Status"] not in [s.value for s in TaskStatus]:
-                error_msg = f"Status '{fields['Status']}' inválido"
-                logger.warning(f"Tarefa '{task_id}': {error_msg}")
+            # Converter o modelo Pydantic para dict, excluindo valores None
+            fields_dict = fields.model_dump(exclude_none=True)
+
+            if not fields_dict:
                 error_count += 1
                 results.append({
                     "task_id": task_id,
                     "status": "error",
-                    "message": error_msg
+                    "message": "Nenhum campo para atualizar foi fornecido"
                 })
                 continue
 
-            # Validar prioridade se estiver sendo atualizada
-            if "Prioridade" in fields and fields["Prioridade"] not in [p.value for p in TaskPriority]:
-                error_msg = f"Prioridade '{fields['Prioridade']}' inválida"
-                logger.warning(f"Tarefa '{task_id}': {error_msg}")
-                error_count += 1
-                results.append({
-                    "task_id": task_id,
-                    "status": "error",
-                    "message": error_msg
-                })
-                continue
+            # Converter para formato de headers do Google Sheets
+            sheet_updates = {field_to_header[k]: v for k, v in fields_dict.items() if k in field_to_header}
+
+            # Verificar se o status está sendo alterado para um estado final
+            final_statuses = [TaskStatus.CONCLUIDO.value, TaskStatus.CANCELADO.value, TaskStatus.NAO_RELACIONADO.value]
+            if fields.status and fields.status in final_statuses:
+                # Adicionar data_solucao automaticamente
+                sheet_updates["Data Solução"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # Encontrar a tarefa (Task ID está na coluna 1, não 0)
             task_found = False
@@ -540,7 +572,7 @@ def batch_update_tasks(batch: BatchTaskUpdate) -> Dict:
                 if len(row) > 1 and row[1] == task_id:
                     task_found = True
                     # Atualizar campos
-                    for key, value in fields.items():
+                    for key, value in sheet_updates.items():
                         if key in headers:
                             idx = headers.index(key)
                             while len(row) <= idx:

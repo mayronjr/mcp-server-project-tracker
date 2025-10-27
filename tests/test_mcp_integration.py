@@ -109,8 +109,7 @@ class TestPydanticModels:
             descricao="Tarefa",
             detalhado="",
             prioridade=TaskPriority.ALTA,
-            status=TaskStatus.EM_DESENVOLVIMENTO,
-            data_solucao=""
+            status=TaskStatus.EM_DESENVOLVIMENTO
         )
 
         # model_dump deve retornar strings devido ao use_enum_values
@@ -171,8 +170,7 @@ class TestPydanticModels:
             descricao="Tarefa 1",
             detalhado="",
             prioridade=TaskPriority.NORMAL,
-            status=TaskStatus.TODO,
-            data_solucao=""
+            status=TaskStatus.TODO
         )
 
         batch = BatchTaskAdd(tasks=[task1])
@@ -181,14 +179,15 @@ class TestPydanticModels:
 
     def test_batch_task_update_validation(self):
         """Testa validação do modelo BatchTaskUpdate."""
-        from models import BatchTaskUpdate, TaskUpdate
+        from models import BatchTaskUpdate, TaskUpdate, TaskUpdateFields
 
+        fields = TaskUpdateFields(status="Concluído")
         update1 = TaskUpdate(
             task_id="TASK-001",
-            fields={"Status": "Concluído"}
+            fields=fields
         )
 
         batch = BatchTaskUpdate(updates=[update1])
         assert len(batch.updates) == 1
         assert batch.updates[0].task_id == "TASK-001"
-        assert batch.updates[0].fields["Status"] == "Concluído"
+        assert batch.updates[0].fields.status == "Concluído"

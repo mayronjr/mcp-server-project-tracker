@@ -102,8 +102,6 @@ def test_list_tasks_with_pagination(mock_env_vars, mock_credentials_file,
     assert result["page"] == 1
     assert result["page_size"] == 2
     assert result["total_pages"] == 2
-    assert result["has_next"] is True
-    assert result["has_previous"] is False
 
 
 def test_list_tasks_pagination_second_page(mock_env_vars, mock_credentials_file,
@@ -116,8 +114,6 @@ def test_list_tasks_pagination_second_page(mock_env_vars, mock_credentials_file,
     assert result["total_count"] == 3
     assert len(result["tasks"]) == 1  # Última página tem apenas 1 item
     assert result["page"] == 2
-    assert result["has_next"] is False
-    assert result["has_previous"] is True
 
 
 def test_list_tasks_with_filters_and_pagination(mock_env_vars, mock_credentials_file,

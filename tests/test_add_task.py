@@ -30,8 +30,7 @@ def test_add_task_with_all_fields(mock_env_vars, mock_credentials_file,
         descricao="Tarefa completa",
         detalhado="Descrição muito detalhada da tarefa",
         prioridade=TaskPriority.URGENTE,
-        status=TaskStatus.EM_DESENVOLVIMENTO,
-        data_solucao="2025-10-25"
+        status=TaskStatus.EM_DESENVOLVIMENTO
     )
 
     result = add_task(task)
@@ -53,8 +52,7 @@ def test_add_task_minimal_fields(mock_env_vars, mock_credentials_file,
         descricao="Tarefa mínima",
         detalhado="",
         prioridade=TaskPriority.NORMAL,
-        status=TaskStatus.TODO,
-        data_solucao=""
+        status=TaskStatus.TODO
     )
 
     result = add_task(task)
@@ -75,8 +73,7 @@ def test_add_task_with_subtask(mock_env_vars, mock_credentials_file,
         descricao="Subtarefa",
         detalhado="Esta é uma subtarefa",
         prioridade=TaskPriority.ALTA,
-        status=TaskStatus.TODO,
-        data_solucao=""
+        status=TaskStatus.TODO
     )
 
     result = add_task(task)
@@ -106,8 +103,7 @@ def test_add_task_with_different_priorities(mock_env_vars, mock_credentials_file
             descricao=f"Tarefa com prioridade {priority.value}",
             detalhado="",
             prioridade=priority,
-            status=TaskStatus.TODO,
-            data_solucao=""
+            status=TaskStatus.TODO
         )
 
         result = add_task(task)
@@ -134,8 +130,7 @@ def test_add_task_with_different_status(mock_env_vars, mock_credentials_file,
             descricao=f"Tarefa com status {status.value}",
             detalhado="",
             prioridade=TaskPriority.NORMAL,
-            status=status,
-            data_solucao=""
+            status=status
         )
 
         result = add_task(task)
@@ -169,8 +164,7 @@ def test_add_task_with_special_characters(mock_env_vars, mock_credentials_file,
         descricao="Tarefa com caracteres: @#$%&*",
         detalhado="Descrição com acentuação: áéíóú ãõ ç",
         prioridade=TaskPriority.NORMAL,
-        status=TaskStatus.TODO,
-        data_solucao=""
+        status=TaskStatus.TODO
     )
 
     result = add_task(task)

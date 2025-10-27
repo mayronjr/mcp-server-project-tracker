@@ -6,7 +6,7 @@ from unittest.mock import patch
 from main import batch_add_tasks, batch_update_tasks, get_valid_configs
 from models import (
     Task, TaskStatus, TaskPriority,
-    BatchTaskAdd, BatchTaskUpdate, TaskUpdate
+    BatchTaskAdd, BatchTaskUpdate, TaskUpdate, TaskUpdateFields
 )
 
 
@@ -25,8 +25,7 @@ class TestBatchAddTasks:
             descricao="Tarefa batch 1",
             detalhado="Detalhes",
             prioridade=TaskPriority.NORMAL,
-            status=TaskStatus.TODO,
-            data_solucao=""
+            status=TaskStatus.TODO
         )
 
         batch = BatchTaskAdd(tasks=[task])
@@ -52,8 +51,7 @@ class TestBatchAddTasks:
                 descricao=f"Tarefa batch {i}",
                 detalhado="",
                 prioridade=TaskPriority.NORMAL,
-                status=TaskStatus.TODO,
-                data_solucao=""
+                status=TaskStatus.TODO
             )
             tasks.append(task)
 
@@ -82,8 +80,7 @@ class TestBatchAddTasks:
                 descricao=f"Tarefa prioridade {priority.value}",
                 detalhado="",
                 prioridade=priority,
-                status=TaskStatus.TODO,
-                data_solucao=""
+                status=TaskStatus.TODO
             )
             tasks.append(task)
 
@@ -109,8 +106,7 @@ class TestBatchAddTasks:
                 descricao="Tarefa erro",
                 detalhado="",
                 prioridade=TaskPriority.NORMAL,
-                status=TaskStatus.TODO,
-                data_solucao=""
+                status=TaskStatus.TODO
             )
 
             batch = BatchTaskAdd(tasks=[task])
@@ -128,7 +124,7 @@ class TestBatchUpdateTasks:
         updates = [
             TaskUpdate(
                 task_id="TASK-001",
-                fields={"Status": "Concluído", "Data Solução": "2025-10-24"}
+                fields=TaskUpdateFields(status="Concluído")
             )
         ]
 
@@ -145,9 +141,9 @@ class TestBatchUpdateTasks:
                                          mock_credentials, mock_get_sheets_service):
         """Testa atualização em lote de múltiplas tarefas."""
         updates = [
-            TaskUpdate(task_id="TASK-001", fields={"Status": "Concluído"}),
-            TaskUpdate(task_id="TASK-002", fields={"Status": "Em Desenvolvimento"}),
-            TaskUpdate(task_id="TASK-003", fields={"Prioridade": "Urgente"})
+            TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
+            TaskUpdate(task_id="TASK-002", fields=TaskUpdateFields(status="Em Desenvolvimento")),
+            TaskUpdate(task_id="TASK-003", fields=TaskUpdateFields(prioridade="Urgente"))
         ]
 
         batch = BatchTaskUpdate(updates=updates)
@@ -162,7 +158,7 @@ class TestBatchUpdateTasks:
                                         mock_credentials, mock_get_sheets_service):
         """Testa atualização de tarefa inexistente."""
         updates = [
-            TaskUpdate(task_id="TASK-999", fields={"Status": "Concluído"})
+            TaskUpdate(task_id="TASK-999", fields=TaskUpdateFields(status="Concluído"))
         ]
 
         batch = BatchTaskUpdate(updates=updates)
@@ -177,38 +173,28 @@ class TestBatchUpdateTasks:
     def test_batch_update_invalid_status(self, mock_env_vars, mock_credentials_file,
                                         mock_credentials, mock_get_sheets_service):
         """Testa atualização com status inválido."""
-        updates = [
-            TaskUpdate(task_id="TASK-001", fields={"Status": "StatusInvalido"})
-        ]
-
-        batch = BatchTaskUpdate(updates=updates)
-        result = batch_update_tasks(batch)
-
-        assert isinstance(result, dict)
-        assert result["error_count"] == 1
-        assert "inválido" in result["details"][0]["message"].lower()
+        # Com Pydantic, status inválido gerará um ValidationError
+        with pytest.raises(Exception):  # Pydantic ValidationError
+            updates = [
+                TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(status="StatusInvalido"))
+            ]
 
     def test_batch_update_invalid_priority(self, mock_env_vars, mock_credentials_file,
                                           mock_credentials, mock_get_sheets_service):
         """Testa atualização com prioridade inválida."""
-        updates = [
-            TaskUpdate(task_id="TASK-001", fields={"Prioridade": "PrioridadeInvalida"})
-        ]
-
-        batch = BatchTaskUpdate(updates=updates)
-        result = batch_update_tasks(batch)
-
-        assert isinstance(result, dict)
-        assert result["error_count"] == 1
-        assert "inv" in result["details"][0]["message"].lower() and "lid" in result["details"][0]["message"].lower()
+        # Com Pydantic, prioridade inválida gerará um ValidationError
+        with pytest.raises(Exception):  # Pydantic ValidationError
+            updates = [
+                TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(prioridade="PrioridadeInvalida"))
+            ]
 
     def test_batch_update_mixed_success_error(self, mock_env_vars, mock_credentials_file,
                                               mock_credentials, mock_get_sheets_service):
         """Testa atualização em lote com sucesso e erros mistos."""
         updates = [
-            TaskUpdate(task_id="TASK-001", fields={"Status": "Concluído"}),
-            TaskUpdate(task_id="TASK-999", fields={"Status": "Concluído"}),
-            TaskUpdate(task_id="TASK-002", fields={"Status": "Em Desenvolvimento"}),
+            TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
+            TaskUpdate(task_id="TASK-999", fields=TaskUpdateFields(status="Concluído")),
+            TaskUpdate(task_id="TASK-002", fields=TaskUpdateFields(status="Em Desenvolvimento")),
         ]
 
         batch = BatchTaskUpdate(updates=updates)
@@ -220,16 +206,15 @@ class TestBatchUpdateTasks:
 
     def test_batch_update_multiple_fields(self, mock_env_vars, mock_credentials_file,
                                          mock_credentials, mock_get_sheets_service):
-        """Testa atualização de múltiplos campos."""
+        """Testa atualização de múltiplos campos (data_solucao é definida automaticamente)."""
         updates = [
             TaskUpdate(
                 task_id="TASK-001",
-                fields={
-                    "Status": "Concluído",
-                    "Prioridade": "Alta",
-                    "Data Solução": "2025-10-24",
-                    "Detalhado": "Tarefa finalizada com sucesso"
-                }
+                fields=TaskUpdateFields(
+                    status="Concluído",
+                    prioridade="Alta",
+                    detalhado="Tarefa finalizada com sucesso"
+                )
             )
         ]
 
