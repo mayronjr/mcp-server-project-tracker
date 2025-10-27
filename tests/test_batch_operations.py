@@ -26,7 +26,6 @@ class TestBatchAddTasks:
             detalhado="Detalhes",
             prioridade=TaskPriority.NORMAL,
             status=TaskStatus.TODO,
-            data_criacao="2025-10-24",
             data_solucao=""
         )
 
@@ -54,7 +53,6 @@ class TestBatchAddTasks:
                 detalhado="",
                 prioridade=TaskPriority.NORMAL,
                 status=TaskStatus.TODO,
-                data_criacao="2025-10-24",
                 data_solucao=""
             )
             tasks.append(task)
@@ -85,7 +83,6 @@ class TestBatchAddTasks:
                 detalhado="",
                 prioridade=priority,
                 status=TaskStatus.TODO,
-                data_criacao="2025-10-24",
                 data_solucao=""
             )
             tasks.append(task)
@@ -113,7 +110,6 @@ class TestBatchAddTasks:
                 detalhado="",
                 prioridade=TaskPriority.NORMAL,
                 status=TaskStatus.TODO,
-                data_criacao="2025-10-24",
                 data_solucao=""
             )
 

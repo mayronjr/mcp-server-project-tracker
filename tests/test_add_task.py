@@ -31,7 +31,6 @@ def test_add_task_with_all_fields(mock_env_vars, mock_credentials_file,
         detalhado="Descrição muito detalhada da tarefa",
         prioridade=TaskPriority.URGENTE,
         status=TaskStatus.EM_DESENVOLVIMENTO,
-        data_criacao="2025-10-24",
         data_solucao="2025-10-25"
     )
 
@@ -55,7 +54,6 @@ def test_add_task_minimal_fields(mock_env_vars, mock_credentials_file,
         detalhado="",
         prioridade=TaskPriority.NORMAL,
         status=TaskStatus.TODO,
-        data_criacao="2025-10-24",
         data_solucao=""
     )
 
@@ -78,7 +76,6 @@ def test_add_task_with_subtask(mock_env_vars, mock_credentials_file,
         detalhado="Esta é uma subtarefa",
         prioridade=TaskPriority.ALTA,
         status=TaskStatus.TODO,
-        data_criacao="2025-10-24",
         data_solucao=""
     )
 
@@ -110,7 +107,6 @@ def test_add_task_with_different_priorities(mock_env_vars, mock_credentials_file
             detalhado="",
             prioridade=priority,
             status=TaskStatus.TODO,
-            data_criacao="2025-10-24",
             data_solucao=""
         )
 
@@ -139,7 +135,6 @@ def test_add_task_with_different_status(mock_env_vars, mock_credentials_file,
             detalhado="",
             prioridade=TaskPriority.NORMAL,
             status=status,
-            data_criacao="2025-10-24",
             data_solucao=""
         )
 
@@ -175,7 +170,6 @@ def test_add_task_with_special_characters(mock_env_vars, mock_credentials_file,
         detalhado="Descrição com acentuação: áéíóú ãõ ç",
         prioridade=TaskPriority.NORMAL,
         status=TaskStatus.TODO,
-        data_criacao="2025-10-24",
         data_solucao=""
     )
 

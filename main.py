@@ -283,8 +283,7 @@ def add_task(task: Task) -> str:
             task.detalhado,
             task.prioridade,  # Já é string devido ao use_enum_values
             task.status,      # Já é string devido ao use_enum_values
-            task.data_criacao,
-            task.data_solucao
+            task.data_criacao
         ]]
         body = {"values": values}
         sheet.values().append(

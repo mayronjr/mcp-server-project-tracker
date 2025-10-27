@@ -2,19 +2,20 @@
 Configuração de fixtures para testes do servidor MCP Kanban Sheets.
 """
 import os
+from typing import Any, Generator
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import AsyncMock, Mock, MagicMock, patch
 
 
 @pytest.fixture
-def mock_env_vars(monkeypatch):
+def mock_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mock das variáveis de ambiente necessárias."""
     monkeypatch.setenv("KANBAN_SHEET_ID", "test-sheet-id-123")
     monkeypatch.setenv("KANBAN_SHEET_NAME", "Test-Sheet")
 
 
 @pytest.fixture
-def sample_sheet_data():
+def sample_sheet_data() -> dict[str, list[list[str]]]:
     """Dados de exemplo de uma planilha Kanban."""
     return {
         "values": [
@@ -33,7 +34,7 @@ def sample_sheet_data():
 
 
 @pytest.fixture
-def empty_sheet_data():
+def empty_sheet_data() -> dict[str, list[list[str]]]:
     """Dados de uma planilha vazia (apenas cabeçalho)."""
     return {
         "values": [
@@ -44,7 +45,7 @@ def empty_sheet_data():
 
 
 @pytest.fixture
-def mock_sheets_service(sample_sheet_data):
+def mock_sheets_service(sample_sheet_data: dict[str, list[list[str]]]) -> MagicMock:
     """Mock do serviço Google Sheets API."""
     mock_service = MagicMock()
 
@@ -88,7 +89,7 @@ def mock_sheets_service(sample_sheet_data):
 
 
 @pytest.fixture
-def mock_credentials():
+def mock_credentials() -> Generator[MagicMock | AsyncMock, Any, None]:
     """Mock das credenciais do Google."""
     with patch('main.Credentials.from_service_account_file') as mock_creds:
         mock_instance = Mock()
@@ -98,7 +99,7 @@ def mock_credentials():
 
 
 @pytest.fixture
-def mock_credentials_file():
+def mock_credentials_file() -> Generator[MagicMock | AsyncMock, Any, None]:
     """Mock para verificação de arquivo de credenciais."""
     with patch('os.path.exists') as mock_exists:
         mock_exists.return_value = True
@@ -134,6 +135,5 @@ def sample_task_data():
         "detalhado": "Descrição detalhada da tarefa",
         "prioridade": "Normal",
         "status": "Todo",
-        "data_criacao": "2025-10-24",
         "data_solucao": ""
     }

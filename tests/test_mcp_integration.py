@@ -88,7 +88,6 @@ class TestPydanticModels:
             "detalhado": "Descrição detalhada",
             "prioridade": TaskPriority.NORMAL,
             "status": TaskStatus.TODO,
-            "data_criacao": "2025-10-24",
             "data_solucao": ""
         }
 
@@ -111,7 +110,6 @@ class TestPydanticModels:
             detalhado="",
             prioridade=TaskPriority.ALTA,
             status=TaskStatus.EM_DESENVOLVIMENTO,
-            data_criacao="2025-10-24",
             data_solucao=""
         )
 
@@ -174,7 +172,6 @@ class TestPydanticModels:
             detalhado="",
             prioridade=TaskPriority.NORMAL,
             status=TaskStatus.TODO,
-            data_criacao="2025-10-24",
             data_solucao=""
         )
 

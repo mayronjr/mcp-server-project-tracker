@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
+from datetime import datetime
 from .task_status import TaskStatus
 from .task_priority import TaskPriority
 
@@ -17,7 +18,10 @@ class Task(BaseModel):
     task_id_root: str = Field(default="", description="ID da tarefa raiz relacionada")
     sprint: str = Field(default="", description="Sprint associada")
     detalhado: str = Field(default="", description="Descrição detalhada")
-    data_criacao: str = Field(default="", description="Data de criação")
+    data_criacao: str = Field(
+        default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        description="Data de criação (gerada automaticamente)"
+    )
     data_solucao: str = Field(default="", description="Data de solução")
 
 
