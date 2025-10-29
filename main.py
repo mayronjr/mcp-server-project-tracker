@@ -65,6 +65,13 @@ def get_sheets_service():
         logger.error(f"Erro ao carregar credenciais: {e}")
         raise
 
+@server.tool("get_one_task")
+def get_one_task(
+    project_id: str,
+    task_id: str
+) -> Dict:
+    pass
+
 @server.tool("list_tasks")
 def list_tasks(
     filters: Optional[SearchFilters] = None,

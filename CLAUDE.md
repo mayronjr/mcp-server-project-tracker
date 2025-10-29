@@ -129,6 +129,33 @@ Required file:
    - Validates enum values before Google Sheets operations
    - Returns appropriate error structures for both single and batch operations
 
+## MCP Tools Quick Reference (for Claude chats)
+
+When using this MCP server in Claude chats, these tools are available:
+
+### list_tasks
+Search/filter tasks. Filters: `prioridade` (Baixa/Normal/Alta/Urgente), `status` (Todo/Em Desenvolvimento/Impedido/Concluído/Cancelado/Não Relacionado/Pausado), `contexto`, `projeto`, `texto_busca`, `task_id`, `sprint`. Supports pagination.
+
+Example: "Show me all high priority Backend tasks in Todo status"
+
+### add_task
+Add single task. Required: `project`, `task_id`, `contexto`, `descricao`, `prioridade`, `status`. Optional: `task_id_root`, `sprint`, `detalhado`.
+
+Example: "Add TASK-101 for project MCP Server, context Backend, description Implement API, priority Alta, status Todo"
+
+### update_task
+Update task by ID. Fields: `status`, `prioridade`, `contexto`, `descricao`, `detalhado`, `sprint`, `task_id_root`. Auto-sets completion date for final statuses.
+
+Example: "Update TASK-101 to status Concluído"
+
+### batch_add_tasks / batch_update_tasks
+Add/update multiple tasks efficiently.
+
+Example: "Mark TASK-101, TASK-102, TASK-103 as Concluído"
+
+### get_valid_configs
+Returns valid Status and Priority values.
+
 ## MCP Client Configuration
 
 To use this server with an MCP client, add to your client configuration:
