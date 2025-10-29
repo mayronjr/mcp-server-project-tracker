@@ -13,7 +13,50 @@ Servidor MCP (Model Context Protocol) para gerenciamento de tarefas em um quadro
 
 ## Ferramentas Disponíveis
 
-### 1. `list_tasks` - Listar e Buscar Tarefas
+### 1. `get_one_task` - Buscar Tarefa Específica
+
+Busca uma tarefa específica pelo ID da tarefa e nome do projeto.
+
+**Parâmetros:**
+- `project` (obrigatório): Nome do projeto
+- `task_id` (obrigatório): ID único da tarefa
+
+**Exemplo:**
+
+```json
+{
+  "project": "MCP Server Sheets",
+  "task_id": "TASK-001"
+}
+```
+
+**Retorno (sucesso):**
+```json
+{
+  "Projeto": "MCP Server Sheets",
+  "Task ID": "TASK-001",
+  "Task ID Root": "TASK-001",
+  "Sprint": "Sprint 1",
+  "Contexto": "Backend",
+  "Descrição": "Implementar busca avançada",
+  "Detalhado": "Adicionar filtros por prioridade, status e contexto",
+  "Prioridade": "Alta",
+  "Status": "Em Desenvolvimento",
+  "Data Criação": "2025-10-24 10:30:00",
+  "Data Solução": ""
+}
+```
+
+**Retorno (não encontrada):**
+```json
+{
+  "error": "Tarefa 'TASK-999' não encontrada no projeto 'MCP Server'"
+}
+```
+
+---
+
+### 2. `list_tasks` - Listar e Buscar Tarefas
 
 Lista e busca tarefas da planilha com filtros avançados e paginação opcional.
 
@@ -110,7 +153,7 @@ Lista e busca tarefas da planilha com filtros avançados e paginação opcional.
 
 ---
 
-### 2. `add_task` - Adicionar Tarefa
+### 3. `add_task` - Adicionar Tarefa
 
 Adiciona uma nova tarefa na planilha.
 
@@ -138,7 +181,7 @@ Adiciona uma nova tarefa na planilha.
 
 ---
 
-### 3. `update_task` - Atualizar Tarefa
+### 4. `update_task` - Atualizar Tarefa
 
 Atualiza uma tarefa existente pelo Task ID.
 
@@ -159,7 +202,7 @@ Atualiza uma tarefa existente pelo Task ID.
 
 ---
 
-### 4. `batch_add_tasks` - Adicionar Múltiplas Tarefas
+### 5. `batch_add_tasks` - Adicionar Múltiplas Tarefas
 
 Adiciona múltiplas tarefas em uma única operação.
 
@@ -214,7 +257,7 @@ Adiciona múltiplas tarefas em uma única operação.
 
 ---
 
-### 5. `batch_update_tasks` - Atualizar Múltiplas Tarefas
+### 6. `batch_update_tasks` - Atualizar Múltiplas Tarefas
 
 Atualiza múltiplas tarefas em uma única operação.
 
@@ -261,7 +304,7 @@ Atualiza múltiplas tarefas em uma única operação.
 
 ---
 
-### 6. `get_valid_configs` - Obter Configurações Válidas
+### 7. `get_valid_configs` - Obter Configurações Válidas
 
 Retorna os valores válidos para Status e Prioridade.
 

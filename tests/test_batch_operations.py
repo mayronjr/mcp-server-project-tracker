@@ -119,7 +119,7 @@ class TestBatchUpdateTasks:
     """Testes para batch_update_tasks."""
 
     def test_batch_update_single_task(self, mock_env_vars, mock_credentials_file,
-                                      mock_credentials, mock_get_sheets_service):
+                                      mock_credentials, mock_connector):
         """Testa atualização em lote de uma única tarefa."""
         updates = [
             TaskUpdate(
@@ -138,7 +138,7 @@ class TestBatchUpdateTasks:
         assert result["details"][0]["status"] == "success"
 
     def test_batch_update_multiple_tasks(self, mock_env_vars, mock_credentials_file,
-                                         mock_credentials, mock_get_sheets_service):
+                                         mock_credentials, mock_connector):
         """Testa atualização em lote de múltiplas tarefas."""
         updates = [
             TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
@@ -155,7 +155,7 @@ class TestBatchUpdateTasks:
         assert len(result["details"]) == 3
 
     def test_batch_update_task_not_found(self, mock_env_vars, mock_credentials_file,
-                                        mock_credentials, mock_get_sheets_service):
+                                        mock_credentials, mock_connector):
         """Testa atualização de tarefa inexistente."""
         updates = [
             TaskUpdate(task_id="TASK-999", fields=TaskUpdateFields(status="Concluído"))
@@ -171,7 +171,7 @@ class TestBatchUpdateTasks:
         assert "não encontrada" in result["details"][0]["message"].lower()
 
     def test_batch_update_invalid_status(self, mock_env_vars, mock_credentials_file,
-                                        mock_credentials, mock_get_sheets_service):
+                                        mock_credentials, mock_connector):
         """Testa atualização com status inválido."""
         # Com Pydantic, status inválido gerará um ValidationError
         with pytest.raises(Exception):  # Pydantic ValidationError
@@ -180,7 +180,7 @@ class TestBatchUpdateTasks:
             ]
 
     def test_batch_update_invalid_priority(self, mock_env_vars, mock_credentials_file,
-                                          mock_credentials, mock_get_sheets_service):
+                                          mock_credentials, mock_connector):
         """Testa atualização com prioridade inválida."""
         # Com Pydantic, prioridade inválida gerará um ValidationError
         with pytest.raises(Exception):  # Pydantic ValidationError
@@ -189,7 +189,7 @@ class TestBatchUpdateTasks:
             ]
 
     def test_batch_update_mixed_success_error(self, mock_env_vars, mock_credentials_file,
-                                              mock_credentials, mock_get_sheets_service):
+                                              mock_credentials, mock_connector):
         """Testa atualização em lote com sucesso e erros mistos."""
         updates = [
             TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
@@ -205,7 +205,7 @@ class TestBatchUpdateTasks:
         assert result["error_count"] == 1
 
     def test_batch_update_multiple_fields(self, mock_env_vars, mock_credentials_file,
-                                         mock_credentials, mock_get_sheets_service):
+                                         mock_credentials, mock_connector):
         """Testa atualização de múltiplos campos (data_solucao é definida automaticamente)."""
         updates = [
             TaskUpdate(

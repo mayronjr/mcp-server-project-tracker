@@ -20,7 +20,7 @@ def sample_sheet_data() -> dict[str, list[list[str]]]:
     return {
         "values": [
             # Cabeçalho
-            ["Projeto", "Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
+            ["Nome Projeto", "Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
              "Detalhado", "Prioridade", "Status", "Data Criação", "Data Solução"],
             # Tarefas de exemplo
             ["TestProject", "TASK-001", "TASK-001", "Sprint 1", "Backend", "Implementar API",
@@ -38,7 +38,7 @@ def empty_sheet_data() -> dict[str, list[list[str]]]:
     """Dados de uma planilha vazia (apenas cabeçalho)."""
     return {
         "values": [
-            ["Projeto", "Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
+            ["Nome Projeto", "Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
              "Detalhado", "Prioridade", "Status", "Data Criação", "Data Solução"]
         ]
     }
@@ -47,11 +47,13 @@ def empty_sheet_data() -> dict[str, list[list[str]]]:
 @pytest.fixture
 def mock_sheets_service(sample_sheet_data: dict[str, list[list[str]]]) -> MagicMock:
     """Mock do serviço Google Sheets API."""
+    import copy
     mock_service = MagicMock()
 
     # Mock do método get (para leitura)
+    # IMPORTANTE: Retornar uma cópia profunda dos dados para evitar mutação entre chamadas
     mock_get = MagicMock()
-    mock_get.execute.return_value = sample_sheet_data
+    mock_get.execute.side_effect = lambda: copy.deepcopy(sample_sheet_data)
 
     # Mock do método append (para adicionar)
     mock_append = MagicMock()
@@ -115,11 +117,36 @@ def mock_sheets_build(mock_sheets_service):
 
 
 @pytest.fixture
-def mock_get_sheets_service(mock_sheets_service):
+def mock_get_sheets_service(mock_sheets_service, mock_env_vars):
     """Mock da função get_sheets_service do main."""
     with patch('main.get_sheets_service') as mock_func:
         mock_func.return_value = mock_sheets_service
         yield mock_func
+
+
+@pytest.fixture
+def mock_connector(mock_sheets_service, mock_env_vars):
+    """Mock do PlanilhasConnector com dados de teste."""
+    from utils.planilhas_connector import PlanilhasConnector
+
+    # Criar connector com serviço mockado
+    connector = PlanilhasConnector(
+        service=mock_sheets_service,
+        spreadsheetId="test-sheet-id-123",
+        range="Test-Sheet!A:K"
+    )
+
+    with patch('main.get_connector') as mock_get_conn:
+        mock_get_conn.return_value = connector
+        yield connector
+
+
+@pytest.fixture(autouse=True)
+def reset_connector_cache():
+    """Reset o connector entre cada teste."""
+    import main
+    yield
+    main.reset_connector()
 
 
 @pytest.fixture

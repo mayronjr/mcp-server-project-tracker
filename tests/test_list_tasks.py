@@ -140,13 +140,30 @@ def test_list_tasks_empty_result(mock_env_vars, mock_credentials_file,
 
 
 def test_list_tasks_empty_sheet(mock_env_vars, mock_credentials_file,
-                                mock_credentials, mock_sheets_service,
-                                empty_sheet_data):
+                                mock_credentials, empty_sheet_data):
     """Testa listagem de planilha vazia."""
-    # Configurar mock para retornar planilha vazia
-    mock_sheets_service.spreadsheets().values().get().execute.return_value = empty_sheet_data
+    from main import reset_connector
+    from unittest.mock import MagicMock, patch
+    import copy
 
-    with patch('main.get_sheets_service', return_value=mock_sheets_service):
+    # Resetar connector antes de criar novo mock
+    reset_connector()
+
+    # Criar mock que retorna dados vazios
+    mock_service = MagicMock()
+    mock_get = MagicMock()
+    mock_get.execute.side_effect = lambda: copy.deepcopy(empty_sheet_data)
+
+    mock_values = MagicMock()
+    mock_values.get.return_value = mock_get
+
+    mock_spreadsheets = MagicMock()
+    mock_spreadsheets.values.return_value = mock_values
+
+    mock_service.spreadsheets.return_value = mock_spreadsheets
+
+    # Aplicar o patch
+    with patch('main.get_sheets_service', return_value=mock_service):
         result = list_tasks()
 
     assert isinstance(result, list)
