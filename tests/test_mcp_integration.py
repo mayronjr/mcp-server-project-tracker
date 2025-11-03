@@ -183,6 +183,7 @@ class TestPydanticModels:
 
         fields = TaskUpdateFields(status="Concluído")
         update1 = TaskUpdate(
+            project="TestProject",
             task_id="TASK-001",
             fields=fields
         )

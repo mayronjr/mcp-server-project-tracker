@@ -67,6 +67,7 @@ class TaskUpdateFields(BaseModel):
 class TaskUpdate(BaseModel):
     """Modelo Pydantic para atualização de uma tarefa"""
 
+    project: str = Field(..., description="Nome do Projeto da Atividade")
     task_id: str = Field(..., description="ID da tarefa a ser atualizada")
     fields: TaskUpdateFields = Field(..., description="Campos a serem atualizados")
 

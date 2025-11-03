@@ -123,6 +123,7 @@ class TestBatchUpdateTasks:
         """Testa atualização em lote de uma única tarefa."""
         updates = [
             TaskUpdate(
+                project="TestProject",
                 task_id="TASK-001",
                 fields=TaskUpdateFields(status="Concluído")
             )
@@ -141,9 +142,9 @@ class TestBatchUpdateTasks:
                                          mock_credentials, mock_connector):
         """Testa atualização em lote de múltiplas tarefas."""
         updates = [
-            TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
-            TaskUpdate(task_id="TASK-002", fields=TaskUpdateFields(status="Em Desenvolvimento")),
-            TaskUpdate(task_id="TASK-003", fields=TaskUpdateFields(prioridade="Urgente"))
+            TaskUpdate(project="TestProject", task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
+            TaskUpdate(project="TestProject", task_id="TASK-002", fields=TaskUpdateFields(status="Em Desenvolvimento")),
+            TaskUpdate(project="TestProject", task_id="TASK-003", fields=TaskUpdateFields(prioridade="Urgente"))
         ]
 
         batch = BatchTaskUpdate(updates=updates)
@@ -158,7 +159,7 @@ class TestBatchUpdateTasks:
                                         mock_credentials, mock_connector):
         """Testa atualização de tarefa inexistente."""
         updates = [
-            TaskUpdate(task_id="TASK-999", fields=TaskUpdateFields(status="Concluído"))
+            TaskUpdate(project="TestProject", task_id="TASK-999", fields=TaskUpdateFields(status="Concluído"))
         ]
 
         batch = BatchTaskUpdate(updates=updates)
@@ -176,7 +177,7 @@ class TestBatchUpdateTasks:
         # Com Pydantic, status inválido gerará um ValidationError
         with pytest.raises(Exception):  # Pydantic ValidationError
             updates = [
-                TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(status="StatusInvalido"))
+                TaskUpdate(project="TestProject", task_id="TASK-001", fields=TaskUpdateFields(status="StatusInvalido"))
             ]
 
     def test_batch_update_invalid_priority(self, mock_env_vars, mock_credentials_file,
@@ -185,16 +186,16 @@ class TestBatchUpdateTasks:
         # Com Pydantic, prioridade inválida gerará um ValidationError
         with pytest.raises(Exception):  # Pydantic ValidationError
             updates = [
-                TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(prioridade="PrioridadeInvalida"))
+                TaskUpdate(project="TestProject", task_id="TASK-001", fields=TaskUpdateFields(prioridade="PrioridadeInvalida"))
             ]
 
     def test_batch_update_mixed_success_error(self, mock_env_vars, mock_credentials_file,
                                               mock_credentials, mock_connector):
         """Testa atualização em lote com sucesso e erros mistos."""
         updates = [
-            TaskUpdate(task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
-            TaskUpdate(task_id="TASK-999", fields=TaskUpdateFields(status="Concluído")),
-            TaskUpdate(task_id="TASK-002", fields=TaskUpdateFields(status="Em Desenvolvimento")),
+            TaskUpdate(project="TestProject", task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
+            TaskUpdate(project="TestProject", task_id="TASK-999", fields=TaskUpdateFields(status="Concluído")),
+            TaskUpdate(project="TestProject", task_id="TASK-002", fields=TaskUpdateFields(status="Em Desenvolvimento")),
         ]
 
         batch = BatchTaskUpdate(updates=updates)
@@ -209,6 +210,7 @@ class TestBatchUpdateTasks:
         """Testa atualização de múltiplos campos (data_solucao é definida automaticamente)."""
         updates = [
             TaskUpdate(
+                project="TestProject",
                 task_id="TASK-001",
                 fields=TaskUpdateFields(
                     status="Concluído",

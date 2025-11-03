@@ -273,7 +273,11 @@ def add_task(task: Task) -> str:
         return error_msg
 
 @server.tool("update_task")
-def update_task(task_id: str, updates: TaskUpdateFields) -> str:
+def update_task(
+    project: str,
+    task_id: str,
+    updates: TaskUpdateFields
+) -> str:
     """
     Atualiza uma tarefa existente pelo Task ID.
 
@@ -323,6 +327,7 @@ def update_task(task_id: str, updates: TaskUpdateFields) -> str:
         # Usar connector
         connector = get_connector()
         result = connector.update_one(update_task_list=[{
+            'project': project,
             'task_id': task_id,
             'updates': sheet_updates
         }])
@@ -473,10 +478,11 @@ def batch_update_tasks(batch: BatchTaskUpdate) -> Dict:
         # Preparar lista de atualizações para o connector
         update_list = []
         for update_item in updates:
+            project = update_item.project
             task_id = update_item.task_id
             fields = update_item.fields
 
-            if not task_id:
+            if not project or not task_id:
                 continue
 
             # Converter o modelo Pydantic para dict, excluindo valores None
@@ -495,6 +501,7 @@ def batch_update_tasks(batch: BatchTaskUpdate) -> Dict:
                 sheet_updates["Data Solução"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             update_list.append({
+                'project': project,
                 'task_id': task_id,
                 'updates': sheet_updates
             })

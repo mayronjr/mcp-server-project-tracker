@@ -255,6 +255,7 @@ class PlanilhasConnector:
 
         Args:
             update_task_list: Lista de dicionários com:
+                - project: Nome do projeto (obrigatório)
                 - task_id: ID da tarefa a atualizar (obrigatório)
                 - updates: Dicionário com campos a atualizar (nomes originais com espaços)
 
@@ -285,8 +286,19 @@ class PlanilhasConnector:
 
             # Processar cada atualização
             for update_item in update_task_list:
+                project = update_item.get('project')
                 task_id = update_item.get('task_id')
                 updates = update_item.get('updates', {})
+
+                # Validar campos obrigatórios
+                if not project:
+                    error_count += 1
+                    results.append({
+                        "task_id": task_id or "unknown",
+                        "status": "error",
+                        "message": "project não fornecido"
+                    })
+                    continue
 
                 if not task_id:
                     error_count += 1
@@ -297,13 +309,13 @@ class PlanilhasConnector:
                     })
                     continue
 
-                # Encontrar a tarefa (Task ID está no índice 1)
+                # Encontrar a tarefa (Nome Projeto está no índice 0, Task ID está no índice 1)
                 task_found = False
                 for i, row in enumerate(values[1:], start=2):
                     # Garantir que row tem comprimento suficiente
                     extended_row = row + [''] * (len(headers) - len(row))
 
-                    if len(extended_row) > 1 and extended_row[1] == task_id:
+                    if len(extended_row) > 1 and extended_row[0] == project and extended_row[1] == task_id:
                         task_found = True
 
                         # Atualizar campos
@@ -330,7 +342,7 @@ class PlanilhasConnector:
                     results.append({
                         "task_id": task_id,
                         "status": "error",
-                        "message": "Tarefa não encontrada"
+                        "message": f"Tarefa '{task_id}' não encontrada no projeto '{project}'"
                     })
 
             # Executar batch update se houver atualizações
