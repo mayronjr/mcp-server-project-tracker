@@ -87,40 +87,56 @@ def reset_connector():
     global _connector
     _connector = None
 
-@server.tool("get_one_task")
-def get_one_task(
+@server.tool("get_one_or_more_tasks")
+def get_one_or_more_tasks(
     project: str,
-    task_id: str
-) -> Dict:
+    task_id_list: List[str]
+) -> List[Dict]:
     """
-    Busca uma tarefa específica pelo ID da tarefa e projeto.
+    Busca uma ou mais tarefas específicas pelos IDs das tarefas e projeto.
 
     Args:
         project: Nome do Projeto
-        task_id: ID único da tarefa
+        task_id_list: Lista de IDs únicos das tarefas
 
     Returns:
-        Dicionário com os dados da tarefa encontrada, ou erro se não encontrada
+        Lista de dicionários com os dados das tarefas encontradas.
+        Tarefas não encontradas ou com erro retornam objeto com campo 'error'.
 
     Exemplo:
-        get_one_task(project="MCP Server", task_id="TASK-001")
+        get_one_or_more_tasks(project="MCP Server", task_id_list=["TASK-001", "TASK-002"])
     """
-    try:
-        logger.info(f"Buscando tarefa '{task_id}' do projeto '{project}'")
-        connector = get_connector()
-        result = connector.get_one(project_id=project, task_id=task_id)
+    if not task_id_list:
+        return []
 
-        if "error" in result:
-            logger.warning(result["error"])
-        else:
-            logger.info(f"Tarefa '{task_id}' encontrada")
+    logger.info(f"Buscando {len(task_id_list)} tarefa(s) do projeto '{project}': {', '.join(task_id_list)}")
+    connector = get_connector()
+    task_list = []
 
-        return result
+    for task_id in task_id_list:
+        try:
+            result = connector.get_one(project_id=project, task_id=task_id)
+            if "error" in result:
+                logger.warning(f"Tarefa '{task_id}' não encontrada: {result['error']}")
+                task_list.append({
+                    'task_id': task_id,
+                    'project': project,
+                    'error': result['error']
+                })
+            else:
+                logger.info(f"Tarefa '{task_id}' encontrada")
+                task_list.append(result)
+        except Exception as e:
+            error_msg = f"Erro ao buscar tarefa '{task_id}': {str(e)}"
+            logger.error(error_msg)
+            task_list.append({
+                'task_id': task_id,
+                'project': project,
+                'error': error_msg
+            })
 
-    except Exception as e:
-        error_msg = f"Erro ao buscar tarefa: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg}
+    logger.info(f"Busca concluída: {sum(1 for t in task_list if 'error' not in t)} tarefa(s) encontrada(s), {sum(1 for t in task_list if 'error' in t)} erro(s)")
+    return task_list
 
 @server.tool("list_tasks")
 def list_tasks(
