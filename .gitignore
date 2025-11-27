@@ -1,6 +1,7 @@
 # Arquivos de ambiente
 .env
 *.env
+*.xlsx
 credentials.json
 
 # Virtual environments

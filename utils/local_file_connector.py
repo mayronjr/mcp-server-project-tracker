@@ -367,3 +367,63 @@ class LocalFileConnector:
                 "error_count": len(update_task_list),
                 "details": [{"error": f"Erro ao atualizar tarefas: {str(e)}"}]
             }
+
+    def get_sprint_stats(self, project: Optional[str] = None) -> List[Dict]:
+        """
+        Calcula estatísticas de sprints com porcentagem de conclusão.
+
+        Args:
+            project: Nome do projeto para filtrar (opcional). Se não fornecido, retorna stats de todas as sprints.
+
+        Returns:
+            Lista de dicionários com estatísticas por sprint:
+            - sprint: Nome da sprint
+            - total_tasks: Total de tarefas na sprint
+            - completed_tasks: Número de tarefas concluídas
+            - completion_percentage: Porcentagem de conclusão (0-100)
+            - tasks_by_status: Distribuição de tarefas por status
+        """
+        try:
+            df_filtered = self.df.copy()
+
+            # Filtrar por projeto se fornecido
+            if project:
+                df_filtered = df_filtered[df_filtered['Nome-Projeto'] == project]
+
+            # Remover linhas sem sprint definida
+            df_filtered = df_filtered[df_filtered['Sprint'].notna() & (df_filtered['Sprint'] != '')]
+
+            if df_filtered.empty:
+                return []
+
+            # Agrupar por sprint
+            sprint_groups = df_filtered.groupby('Sprint')
+
+            sprint_stats = []
+            for sprint_name, sprint_df in sprint_groups:
+                total_tasks = len(sprint_df)
+
+                # Contar tarefas concluídas (Status = "Concluído")
+                completed_tasks = len(sprint_df[sprint_df['Status'] == 'Concluído'])
+
+                # Calcular porcentagem de conclusão
+                completion_percentage = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0.0
+
+                # Contar tarefas por status
+                tasks_by_status = sprint_df['Status'].value_counts().to_dict()
+
+                sprint_stats.append({
+                    'sprint': sprint_name,
+                    'total_tasks': total_tasks,
+                    'completed_tasks': completed_tasks,
+                    'completion_percentage': round(completion_percentage, 2),
+                    'tasks_by_status': tasks_by_status
+                })
+
+            # Ordenar por nome da sprint
+            sprint_stats.sort(key=lambda x: x['sprint'])
+
+            return sprint_stats
+
+        except Exception as e:
+            return [{"error": f"Erro ao calcular estatísticas de sprints: {str(e)}"}]

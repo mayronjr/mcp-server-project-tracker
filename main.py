@@ -409,5 +409,60 @@ def get_valid_configs() -> Dict[str, List[str]]:
         'valid_task_priorities': [priority.value for priority in TaskPriority]
     }
 
+@server.tool("get_sprint_stats")
+def get_sprint_stats(project: Optional[str] = None) -> Dict:
+    """
+    Retorna estatísticas de sprints com porcentagem de conclusão das tarefas.
+
+    Args:
+        project: Nome do projeto para filtrar sprints (opcional). Se não fornecido, retorna stats de todas as sprints.
+
+    Returns:
+        Dicionário com:
+        - sprints: Lista de estatísticas por sprint contendo:
+            - sprint: Nome da sprint
+            - total_tasks: Total de tarefas na sprint
+            - completed_tasks: Número de tarefas concluídas
+            - completion_percentage: Porcentagem de conclusão (0-100)
+            - tasks_by_status: Distribuição de tarefas por status
+        - total_sprints: Total de sprints encontradas
+
+    Exemplo:
+        get_sprint_stats()
+        get_sprint_stats(project="MCP Server")
+    """
+    try:
+        logger.info(f"Calculando estatísticas de sprints" + (f" para o projeto '{project}'" if project else ""))
+
+        connector = get_connector()
+        sprint_stats = connector.get_sprint_stats(project=project)
+
+        # Verificar se houve erro
+        if sprint_stats and isinstance(sprint_stats, list) and len(sprint_stats) > 0:
+            if "error" in sprint_stats[0]:
+                logger.error(f"Erro ao calcular estatísticas: {sprint_stats[0]['error']}")
+                return {
+                    "sprints": [],
+                    "total_sprints": 0,
+                    "error": sprint_stats[0]['error']
+                }
+
+        total_sprints = len(sprint_stats)
+        logger.info(f"Estatísticas calculadas para {total_sprints} sprint(s)")
+
+        return {
+            "sprints": sprint_stats,
+            "total_sprints": total_sprints
+        }
+
+    except Exception as e:
+        error_msg = f"Erro ao calcular estatísticas de sprints: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "sprints": [],
+            "total_sprints": 0,
+            "error": error_msg
+        }
+
 if __name__ == "__main__":
     server.run()

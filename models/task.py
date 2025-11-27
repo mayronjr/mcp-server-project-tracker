@@ -152,3 +152,34 @@ class PaginatedResponse(BaseModel):
     total_pages: int = Field(
         description="Total de páginas disponíveis"
     )
+
+
+class SprintStats(BaseModel):
+    """Modelo Pydantic para estatísticas de uma sprint"""
+
+    sprint: str = Field(
+        description="Nome da sprint"
+    )
+    total_tasks: int = Field(
+        description="Total de tarefas na sprint"
+    )
+    completed_tasks: int = Field(
+        description="Número de tarefas concluídas"
+    )
+    completion_percentage: float = Field(
+        description="Porcentagem de conclusão (0-100)"
+    )
+    tasks_by_status: dict = Field(
+        description="Distribuição de tarefas por status"
+    )
+
+
+class SprintStatsResponse(BaseModel):
+    """Modelo Pydantic para resposta de estatísticas de sprints"""
+
+    sprints: List[SprintStats] = Field(
+        description="Lista de estatísticas por sprint"
+    )
+    total_sprints: int = Field(
+        description="Total de sprints encontradas"
+    )
