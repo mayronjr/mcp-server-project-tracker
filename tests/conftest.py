@@ -1,144 +1,102 @@
 """
 Configuração de fixtures para testes do servidor MCP Kanban Sheets.
 """
-import os
-from typing import Any, Generator
 import pytest
-from unittest.mock import AsyncMock, Mock, MagicMock, patch
+from unittest.mock import patch
+import pandas as pd
 
 
 @pytest.fixture
-def mock_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+def mock_env_vars(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """Mock das variáveis de ambiente necessárias."""
-    monkeypatch.setenv("KANBAN_SHEET_ID", "test-sheet-id-123")
+    test_file = tmp_path / "test_kanban.xlsx"
+    monkeypatch.setenv("KANBAN_FILE_PATH", str(test_file))
     monkeypatch.setenv("KANBAN_SHEET_NAME", "Test-Sheet")
 
 
 @pytest.fixture
-def sample_sheet_data() -> dict[str, list[list[str]]]:
-    """Dados de exemplo de uma planilha Kanban."""
-    return {
-        "values": [
-            # Cabeçalho
-            ["Nome Projeto", "Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
-             "Detalhado", "Prioridade", "Status", "Data Criação", "Data Solução"],
-            # Tarefas de exemplo
-            ["TestProject", "TASK-001", "TASK-001", "Sprint 1", "Backend", "Implementar API",
-             "Criar endpoints REST", "Alta", "Em Desenvolvimento", "2025-10-20", ""],
-            ["TestProject", "TASK-002", "TASK-002", "Sprint 1", "Frontend", "Criar interface",
-             "Interface do usuário", "Normal", "Todo", "2025-10-21", ""],
-            ["TestProject", "TASK-003", "TASK-001", "Sprint 2", "Backend", "Adicionar testes",
-             "Testes unitários e integração", "Urgente", "Todo", "2025-10-22", ""],
-        ]
+def sample_data() -> pd.DataFrame:
+    """Dados de exemplo de um arquivo Kanban."""
+    data = {
+        'Nome-Projeto': ['TestProject', 'TestProject', 'TestProject'],
+        'Task-ID': ['TASK-001', 'TASK-002', 'TASK-003'],
+        'Task-ID-Root': ['TASK-001', 'TASK-002', 'TASK-001'],
+        'Sprint': ['Sprint 1', 'Sprint 1', 'Sprint 2'],
+        'Contexto': ['Backend', 'Frontend', 'Backend'],
+        'Descrição': ['Implementar API', 'Criar interface', 'Adicionar testes'],
+        'Detalhado': ['Criar endpoints REST', 'Interface do usuário', 'Testes unitários e integração'],
+        'Prioridade': ['Alta', 'Normal', 'Urgente'],
+        'Status': ['Em Desenvolvimento', 'Todo', 'Todo'],
+        'Data-Criação': ['2025-10-20', '2025-10-21', '2025-10-22'],
+        'Data-Solução': ['', '', '']
     }
+    return pd.DataFrame(data)
 
 
 @pytest.fixture
-def empty_sheet_data() -> dict[str, list[list[str]]]:
-    """Dados de uma planilha vazia (apenas cabeçalho)."""
-    return {
-        "values": [
-            ["Nome Projeto", "Task ID", "Task ID Root", "Sprint", "Contexto", "Descrição",
-             "Detalhado", "Prioridade", "Status", "Data Criação", "Data Solução"]
-        ]
-    }
+def empty_data() -> pd.DataFrame:
+    """Dados de um arquivo vazio (apenas estrutura)."""
+    return pd.DataFrame(columns=[
+        'Nome-Projeto', 'Task-ID', 'Task-ID-Root', 'Sprint', 'Contexto',
+        'Descrição', 'Detalhado', 'Prioridade', 'Status',
+        'Data-Criação', 'Data-Solução'
+    ])
 
 
 @pytest.fixture
-def mock_sheets_service(sample_sheet_data: dict[str, list[list[str]]]) -> MagicMock:
-    """Mock do serviço Google Sheets API."""
-    import copy
-    mock_service = MagicMock()
+def temp_excel_file(tmp_path, sample_data):
+    """Cria um arquivo Excel temporário com dados de teste."""
+    file_path = tmp_path / "test_kanban.xlsx"
 
-    # Mock do método get (para leitura)
-    # IMPORTANTE: Retornar uma cópia profunda dos dados para evitar mutação entre chamadas
-    mock_get = MagicMock()
-    mock_get.execute.side_effect = lambda: copy.deepcopy(sample_sheet_data)
+    # Converter colunas de volta para formato com espaços
+    df_to_save = sample_data.copy()
+    df_to_save.columns = [col.replace('-', ' ') for col in df_to_save.columns]
 
-    # Mock do método append (para adicionar)
-    mock_append = MagicMock()
-    mock_append.execute.return_value = {
-        "updates": {
-            "updatedRows": 1
-        }
-    }
+    # Salvar arquivo Excel
+    df_to_save.to_excel(file_path, sheet_name='Test-Sheet', index=False)
 
-    # Mock do método update (para atualizar)
-    mock_update = MagicMock()
-    mock_update.execute.return_value = {
-        "updatedCells": 1
-    }
-
-    # Mock do método batchUpdate (para atualização em lote)
-    mock_batch_update = MagicMock()
-    mock_batch_update.execute.return_value = {
-        "totalUpdatedRows": 3
-    }
-
-    # Configurar a cadeia de chamadas
-    mock_values = MagicMock()
-    mock_values.get.return_value = mock_get
-    mock_values.append.return_value = mock_append
-    mock_values.update.return_value = mock_update
-    mock_values.batchUpdate.return_value = mock_batch_update
-
-    mock_spreadsheets = MagicMock()
-    mock_spreadsheets.values.return_value = mock_values
-
-    mock_service.spreadsheets.return_value = mock_spreadsheets
-
-    return mock_service
+    return str(file_path)
 
 
 @pytest.fixture
-def mock_credentials() -> Generator[MagicMock | AsyncMock, Any, None]:
-    """Mock das credenciais do Google."""
-    with patch('main.Credentials.from_service_account_file') as mock_creds:
-        mock_instance = Mock()
-        mock_instance.universe_domain = "googleapis.com"
-        mock_creds.return_value = mock_instance
-        yield mock_creds
+def temp_csv_file(tmp_path, sample_data):
+    """Cria um arquivo CSV temporário com dados de teste."""
+    file_path = tmp_path / "test_kanban.csv"
+
+    # Converter colunas de volta para formato com espaços
+    df_to_save = sample_data.copy()
+    df_to_save.columns = [col.replace('-', ' ') for col in df_to_save.columns]
+
+    # Salvar arquivo CSV
+    df_to_save.to_csv(file_path, index=False)
+
+    return str(file_path)
 
 
 @pytest.fixture
-def mock_credentials_file() -> Generator[MagicMock | AsyncMock, Any, None]:
-    """Mock para verificação de arquivo de credenciais."""
-    with patch('os.path.exists') as mock_exists:
-        mock_exists.return_value = True
-        yield mock_exists
+def mock_connector(sample_data, tmp_path):
+    """Mock do LocalFileConnector com dados de teste."""
+    from utils.local_file_connector import LocalFileConnector
 
+    # Criar arquivo temporário
+    file_path = tmp_path / "test_kanban.xlsx"
 
-@pytest.fixture
-def mock_sheets_build(mock_sheets_service):
-    """Mock da função build do Google API."""
-    with patch('main.build') as mock_build:
-        mock_build.return_value = mock_sheets_service
-        yield mock_build
+    # Mock do __load_data e __save_data para evitar I/O real
+    with patch.object(LocalFileConnector, '_LocalFileConnector__load_data'), \
+         patch.object(LocalFileConnector, '_LocalFileConnector__save_data'):
 
+        # Criar connector
+        connector = LocalFileConnector(
+            file_path=str(file_path),
+            sheet_name="Test-Sheet"
+        )
 
-@pytest.fixture
-def mock_get_sheets_service(mock_sheets_service, mock_env_vars):
-    """Mock da função get_sheets_service do main."""
-    with patch('main.get_sheets_service') as mock_func:
-        mock_func.return_value = mock_sheets_service
-        yield mock_func
+        # Injetar dados de teste diretamente
+        connector.df = sample_data.copy()
 
-
-@pytest.fixture
-def mock_connector(mock_sheets_service, mock_env_vars):
-    """Mock do PlanilhasConnector com dados de teste."""
-    from utils.planilhas_connector import PlanilhasConnector
-
-    # Criar connector com serviço mockado
-    connector = PlanilhasConnector(
-        service=mock_sheets_service,
-        spreadsheetId="test-sheet-id-123",
-        range="Test-Sheet!A:K"
-    )
-
-    with patch('main.get_connector') as mock_get_conn:
-        mock_get_conn.return_value = connector
-        yield connector
+        with patch('main.get_connector') as mock_get_conn:
+            mock_get_conn.return_value = connector
+            yield connector
 
 
 @pytest.fixture(autouse=True)
@@ -163,4 +121,16 @@ def sample_task_data():
         "prioridade": "Normal",
         "status": "Todo",
         "data_solucao": ""
+    }
+
+
+@pytest.fixture
+def empty_sheet_data():
+    """Dados de planilha vazia (apenas cabeçalho)."""
+    return {
+        'values': [
+            ['Nome Projeto', 'Task ID', 'Task ID Root', 'Sprint', 'Contexto',
+             'Descrição', 'Detalhado', 'Prioridade', 'Status',
+             'Data Criação', 'Data Solução']
+        ]
     }

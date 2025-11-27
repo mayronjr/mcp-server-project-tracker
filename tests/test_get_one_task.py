@@ -5,8 +5,7 @@ import pytest
 from main import get_one_or_more_tasks
 
 
-def test_get_one_task_success(mock_env_vars, mock_credentials_file,
-                                mock_credentials, mock_get_sheets_service):
+def test_get_one_task_success(mock_env_vars, mock_connector):
     """Testa busca de uma tarefa específica com sucesso."""
     result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-001"])
 
@@ -21,8 +20,7 @@ def test_get_one_task_success(mock_env_vars, mock_credentials_file,
     assert result[0]["Status"] == "Em Desenvolvimento"
 
 
-def test_get_multiple_tasks_success(mock_env_vars, mock_credentials_file,
-                                     mock_credentials, mock_get_sheets_service):
+def test_get_multiple_tasks_success(mock_env_vars, mock_connector):
     """Testa busca de múltiplas tarefas com sucesso."""
     result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-001", "TASK-002"])
 
@@ -42,8 +40,7 @@ def test_get_multiple_tasks_success(mock_env_vars, mock_credentials_file,
     assert result[1]["Prioridade"] == "Normal"
 
 
-def test_get_one_task_different_task(mock_env_vars, mock_credentials_file,
-                                      mock_credentials, mock_get_sheets_service):
+def test_get_one_task_different_task(mock_env_vars, mock_connector):
     """Testa busca de uma segunda tarefa diferente."""
     result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-002"])
 
@@ -58,8 +55,7 @@ def test_get_one_task_different_task(mock_env_vars, mock_credentials_file,
     assert result[0]["Status"] == "Todo"
 
 
-def test_get_one_task_with_root_id(mock_env_vars, mock_credentials_file,
-                                    mock_credentials, mock_get_sheets_service):
+def test_get_one_task_with_root_id(mock_env_vars, mock_connector):
     """Testa busca de uma tarefa com task_id_root definido."""
     result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-003"])
 
@@ -71,8 +67,7 @@ def test_get_one_task_with_root_id(mock_env_vars, mock_credentials_file,
     assert result[0]["Nome Projeto"] == "TestProject"
 
 
-def test_get_one_task_not_found(mock_env_vars, mock_credentials_file,
-                                 mock_credentials, mock_get_sheets_service):
+def test_get_one_task_not_found(mock_env_vars, mock_connector):
     """Testa busca de uma tarefa que não existe."""
     result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-999"])
 
@@ -84,8 +79,7 @@ def test_get_one_task_not_found(mock_env_vars, mock_credentials_file,
     assert "não encontrada" in result[0]["error"]
 
 
-def test_get_multiple_tasks_partial_found(mock_env_vars, mock_credentials_file,
-                                           mock_credentials, mock_get_sheets_service):
+def test_get_multiple_tasks_partial_found(mock_env_vars, mock_connector):
     """Testa busca de múltiplas tarefas onde algumas existem e outras não."""
     result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-001", "TASK-999", "TASK-002"])
 
@@ -106,8 +100,7 @@ def test_get_multiple_tasks_partial_found(mock_env_vars, mock_credentials_file,
     assert result[2]["Task ID"] == "TASK-002"
 
 
-def test_get_one_task_wrong_project(mock_env_vars, mock_credentials_file,
-                                     mock_credentials, mock_get_sheets_service):
+def test_get_one_task_wrong_project(mock_env_vars, mock_connector):
     """Testa busca de uma tarefa com projeto incorreto."""
     result = get_one_or_more_tasks(project="WrongProject", task_id_list=["TASK-001"])
 
@@ -119,8 +112,7 @@ def test_get_one_task_wrong_project(mock_env_vars, mock_credentials_file,
     assert "não encontrada" in result[0]["error"]
 
 
-def test_get_empty_list(mock_env_vars, mock_credentials_file,
-                        mock_credentials, mock_get_sheets_service):
+def test_get_empty_list(mock_env_vars, mock_connector):
     """Testa busca com lista vazia de task_ids."""
     result = get_one_or_more_tasks(project="TestProject", task_id_list=[])
 
@@ -128,32 +120,25 @@ def test_get_empty_list(mock_env_vars, mock_credentials_file,
     assert len(result) == 0
 
 
-def test_get_one_task_empty_sheet(mock_env_vars, mock_credentials_file,
-                                   mock_credentials, empty_sheet_data):
+def test_get_one_task_empty_sheet(mock_env_vars, empty_data):
     """Testa busca em planilha vazia."""
     from main import reset_connector
-    from unittest.mock import MagicMock, patch
-    import copy
+    from unittest.mock import patch
+    from utils.local_file_connector import LocalFileConnector
 
     # Resetar connector antes de criar novo mock
     reset_connector()
 
-    # Criar mock que retorna dados vazios
-    mock_service = MagicMock()
-    mock_get = MagicMock()
-    mock_get.execute.side_effect = lambda: copy.deepcopy(empty_sheet_data)
+    # Criar connector com dados vazios
+    with patch.object(LocalFileConnector, '_LocalFileConnector__load_data'), \
+         patch.object(LocalFileConnector, '_LocalFileConnector__save_data'):
+        import tempfile
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+        connector = LocalFileConnector(file_path=temp_file.name, sheet_name="Test")
+        connector.df = empty_data.copy()
 
-    mock_values = MagicMock()
-    mock_values.get.return_value = mock_get
-
-    mock_spreadsheets = MagicMock()
-    mock_spreadsheets.values.return_value = mock_values
-
-    mock_service.spreadsheets.return_value = mock_spreadsheets
-
-    # Aplicar o patch
-    with patch('main.get_sheets_service', return_value=mock_service):
-        result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-001"])
+        with patch('main.get_connector', return_value=connector):
+            result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-001"])
 
     assert isinstance(result, list)
     assert len(result) == 1
@@ -162,31 +147,25 @@ def test_get_one_task_empty_sheet(mock_env_vars, mock_credentials_file,
     assert "não encontrada" in result[0]["error"].lower()
 
 
-def test_get_one_task_no_data(mock_env_vars, mock_credentials_file,
-                               mock_credentials):
+def test_get_one_task_no_data(mock_env_vars, empty_data):
     """Testa busca quando não há dados na planilha."""
     from main import reset_connector
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import patch
+    from utils.local_file_connector import LocalFileConnector
 
     # Resetar connector antes de criar novo mock
     reset_connector()
 
-    # Criar mock que retorna sem values
-    mock_service = MagicMock()
-    mock_get = MagicMock()
-    mock_get.execute.return_value = {}
+    # Criar connector com dados vazios
+    with patch.object(LocalFileConnector, '_LocalFileConnector__load_data'), \
+         patch.object(LocalFileConnector, '_LocalFileConnector__save_data'):
+        import tempfile
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+        connector = LocalFileConnector(file_path=temp_file.name, sheet_name="Test")
+        connector.df = empty_data.copy()
 
-    mock_values = MagicMock()
-    mock_values.get.return_value = mock_get
-
-    mock_spreadsheets = MagicMock()
-    mock_spreadsheets.values.return_value = mock_values
-
-    mock_service.spreadsheets.return_value = mock_spreadsheets
-
-    # Aplicar o patch
-    with patch('main.get_sheets_service', return_value=mock_service):
-        result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-001"])
+        with patch('main.get_connector', return_value=connector):
+            result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-001"])
 
     assert isinstance(result, list)
     assert len(result) == 1
@@ -194,9 +173,8 @@ def test_get_one_task_no_data(mock_env_vars, mock_credentials_file,
     assert "não encontrada" in result[0]["error"].lower()
 
 
-def test_get_one_task_api_error(mock_env_vars, mock_credentials_file,
-                                 mock_credentials, mock_connector):
-    """Testa tratamento de erro na API do Google Sheets."""
+def test_get_one_task_api_error(mock_env_vars, mock_connector):
+    """Testa tratamento de erro na API."""
     from unittest.mock import patch
 
     # Configurar patch para lançar exceção no get_one
@@ -211,8 +189,7 @@ def test_get_one_task_api_error(mock_env_vars, mock_credentials_file,
     assert "Erro ao buscar tarefa" in result[0]["error"]
 
 
-def test_get_multiple_tasks_all_errors(mock_env_vars, mock_credentials_file,
-                                        mock_credentials, mock_connector):
+def test_get_multiple_tasks_all_errors(mock_env_vars, mock_connector):
     """Testa busca de múltiplas tarefas onde todas retornam erro."""
     from unittest.mock import patch
 
@@ -230,8 +207,7 @@ def test_get_multiple_tasks_all_errors(mock_env_vars, mock_credentials_file,
         assert result[i]["project"] == "TestProject"
 
 
-def test_get_one_task_returns_all_fields(mock_env_vars, mock_credentials_file,
-                                          mock_credentials, mock_get_sheets_service):
+def test_get_one_task_returns_all_fields(mock_env_vars, mock_connector):
     """Testa se todos os campos da tarefa são retornados."""
     result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-001"])
 
@@ -248,8 +224,7 @@ def test_get_one_task_returns_all_fields(mock_env_vars, mock_credentials_file,
         assert field in result[0], f"Campo '{field}' não encontrado no resultado"
 
 
-def test_get_one_task_case_sensitive(mock_env_vars, mock_credentials_file,
-                                      mock_credentials, mock_get_sheets_service):
+def test_get_one_task_case_sensitive(mock_env_vars, mock_connector):
     """Testa se a busca é case-sensitive para project e task_id."""
     # Tentar com case diferente
     result = get_one_or_more_tasks(project="testproject", task_id_list=["task-001"])
@@ -262,8 +237,7 @@ def test_get_one_task_case_sensitive(mock_env_vars, mock_credentials_file,
     assert "não encontrada" in result[0]["error"]
 
 
-def test_get_three_tasks_all_found(mock_env_vars, mock_credentials_file,
-                                    mock_credentials, mock_get_sheets_service):
+def test_get_three_tasks_all_found(mock_env_vars, mock_connector):
     """Testa busca de três tarefas existentes."""
     result = get_one_or_more_tasks(project="TestProject", task_id_list=["TASK-001", "TASK-002", "TASK-003"])
 

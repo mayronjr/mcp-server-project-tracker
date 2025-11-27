@@ -3,22 +3,18 @@ import sys
 import logging
 from typing import List, Dict, Optional, Union
 from datetime import datetime
-from googleapiclient.discovery import build
-from google.oauth2.service_account import Credentials
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
 from models import (
     TaskStatus,
     TaskPriority,
-    Task,
-    TaskUpdateFields,
     BatchTaskUpdate,
     BatchTaskAdd,
     SearchFilters,
     PaginationParams
 )
-from utils.planilhas_connector import PlanilhasConnector
+from utils.local_file_connector import LocalFileConnector
 
 # Configurar logging para stderr (nunca usar stdout em servidores MCP STDIO)
 logging.basicConfig(
@@ -31,55 +27,34 @@ logger = logging.getLogger("kanban-sheets")
 load_dotenv('.env')
 
 # Configuração: variáveis de ambiente
-SPREADSHEET_ID = os.getenv("KANBAN_SHEET_ID")
-SHEET_NAME = os.getenv("KANBAN_SHEET_NAME", "Back-End")  # Nome da aba, padrão "Back-End"
-RANGE_NAME = f"{SHEET_NAME}!A:K"
+KANBAN_FILE_PATH = os.getenv("KANBAN_FILE_PATH", "kanban.xlsx")
+KANBAN_SHEET_NAME = os.getenv("KANBAN_SHEET_NAME")  # Nome da aba (apenas para Excel, opcional)
 
-if not SPREADSHEET_ID:
-    raise EnvironmentError("Defina a variável de ambiente KANBAN_SHEET_ID com o ID da planilha.")
+# Validar caminho do arquivo
+if not KANBAN_FILE_PATH:
+    raise EnvironmentError("Defina a variável de ambiente KANBAN_FILE_PATH com o caminho do arquivo Kanban.")
 
-# Validar existência do arquivo de credenciais
-CREDENTIALS_FILE = "credentials.json"
-if not os.path.exists(CREDENTIALS_FILE):
-    raise FileNotFoundError(
-        f"Arquivo de credenciais '{CREDENTIALS_FILE}' não encontrado. "
-        "Certifique-se de que o arquivo existe no diretório do projeto."
-    )
+# Verificar se o arquivo existe ou pode ser criado
+file_dir = os.path.dirname(KANBAN_FILE_PATH)
+if file_dir and not os.path.exists(file_dir):
+    raise FileNotFoundError(f"Diretório não encontrado: {file_dir}")
 
 # Inicializa o MCP server
 server = FastMCP("kanban-sheets")
 logger.info("Servidor MCP inicializado: kanban-sheets")
 
-# Autenticação via Service Account (arquivo credentials.json)
-def get_sheets_service():
-    """Cria e retorna um serviço autenticado do Google Sheets API."""
-    try:
-        creds = Credentials.from_service_account_file(
-            CREDENTIALS_FILE,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"]
-        )
-        logger.debug("Credenciais carregadas com sucesso")
-        return build("sheets", "v4", credentials=creds)
-    except Exception as e:
-        logger.error(f"Erro ao carregar credenciais: {e}")
-        raise
-
 # Inicializar connector (será usado por todas as funções)
-_connector: Optional[PlanilhasConnector] = None
+_connector: Optional[LocalFileConnector] = None
 
-def get_connector() -> PlanilhasConnector:
-    """Retorna a instância do PlanilhasConnector, criando-a se necessário."""
+def get_connector() -> LocalFileConnector:
+    """Retorna a instância do LocalFileConnector, criando-a se necessário."""
     global _connector
     if _connector is None:
-        if not SPREADSHEET_ID:
-            raise EnvironmentError("SPREADSHEET_ID não definido")
-        service = get_sheets_service()
-        _connector = PlanilhasConnector(
-            service=service,
-            spreadsheetId=SPREADSHEET_ID,
-            range=RANGE_NAME
+        _connector = LocalFileConnector(
+            file_path=KANBAN_FILE_PATH,
+            sheet_name=KANBAN_SHEET_NAME
         )
-        logger.info("PlanilhasConnector inicializado")
+        logger.info(f"LocalFileConnector inicializado para arquivo: {KANBAN_FILE_PATH}")
     return _connector
 
 def reset_connector():
@@ -239,137 +214,6 @@ def list_tasks(
             }
         return [{"error": error_msg}]
 
-@server.tool("add_task")
-def add_task(task: Task) -> str:
-    """
-    Adiciona uma nova tarefa na planilha.
-
-    Args:
-        task: Objeto Task com todos os campos da tarefa
-    """
-    try:
-        logger.info(f"Adicionando tarefa '{task.task_id}'")
-
-        # Gerar data_criacao automaticamente
-        data_criacao = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Converter o modelo Pydantic para lista de valores
-        # Ordem das colunas: Nome Projeto, Task ID, Task ID Root, Sprint, Contexto,
-        # Descrição, Detalhado, Prioridade, Status, Data Criação, Data Solução
-        values = [[
-            task.project,
-            task.task_id,
-            task.task_id_root,
-            task.sprint,
-            task.contexto,
-            task.descricao,
-            task.detalhado,
-            task.prioridade,  # Já é string devido ao use_enum_values
-            task.status,      # Já é string devido ao use_enum_values
-            data_criacao,
-            ""  # data_solucao vazia por padrão
-        ]]
-
-        # Usar connector
-        connector = get_connector()
-        result = connector.add(new_task_list=values)
-
-        if "error" in result:
-            error_msg = result["error"]
-            logger.error(error_msg)
-            return error_msg
-
-        success_msg = f"Tarefa '{task.task_id}' adicionada com sucesso."
-        logger.info(success_msg)
-        return success_msg
-
-    except Exception as e:
-        error_msg = f"Erro ao adicionar tarefa: {str(e)}"
-        logger.error(error_msg)
-        return error_msg
-
-@server.tool("update_task")
-def update_task(
-    project: str,
-    task_id: str,
-    updates: TaskUpdateFields
-) -> str:
-    """
-    Atualiza uma tarefa existente pelo Task ID.
-
-    Args:
-        task_id: ID da tarefa a ser atualizada
-        updates: Objeto TaskUpdateFields com os campos a atualizar.
-                 Campos válidos: task_id_root, sprint, contexto, descricao,
-                 detalhado, prioridade, status
-
-    Exemplo:
-        updates = TaskUpdateFields(status="Concluído")
-
-    Nota: data_solucao é automaticamente definida quando o status é alterado
-          para "Concluído", "Cancelado" ou "Não Relacionado"
-    """
-    # Mapeamento de campos Python para nomes de colunas do Google Sheets
-    field_to_header = {
-        "task_id_root": "Task ID Root",
-        "sprint": "Sprint",
-        "contexto": "Contexto",
-        "descricao": "Descrição",
-        "detalhado": "Detalhado",
-        "prioridade": "Prioridade",
-        "status": "Status"
-    }
-
-    # Converter o modelo Pydantic para dict, excluindo valores None
-    updates_dict = updates.model_dump(exclude_none=True)
-
-    if not updates_dict:
-        error_msg = "Erro: Nenhum campo para atualizar foi fornecido."
-        logger.warning(error_msg)
-        return error_msg
-
-    # Converter para formato de headers do Google Sheets
-    sheet_updates = {field_to_header[k]: v for k, v in updates_dict.items() if k in field_to_header}
-
-    # Verificar se o status está sendo alterado para um estado final
-    final_statuses = [TaskStatus.CONCLUIDO.value, TaskStatus.CANCELADO.value, TaskStatus.NAO_RELACIONADO.value]
-    if updates.status and updates.status in final_statuses:
-        # Adicionar data_solucao automaticamente
-        sheet_updates["Data Solução"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    try:
-        logger.info(f"Atualizando tarefa '{task_id}' com {len(sheet_updates)} campo(s)")
-
-        # Usar connector
-        connector = get_connector()
-        result = connector.update_one(update_task_list=[{
-            'project': project,
-            'task_id': task_id,
-            'updates': sheet_updates
-        }])
-
-        if "error" in result:
-            error_msg = result["error"]
-            logger.error(error_msg)
-            return error_msg
-
-        # Verificar resultado
-        if result['success_count'] > 0:
-            success_msg = f"Tarefa '{task_id}' atualizada com sucesso."
-            logger.info(success_msg)
-            return success_msg
-        else:
-            # Pegar mensagem de erro dos detalhes
-            error_detail = result['details'][0] if result['details'] else {}
-            warning_msg = error_detail.get('message', f"Tarefa '{task_id}' não encontrada.")
-            logger.warning(warning_msg)
-            return warning_msg
-
-    except Exception as e:
-        error_msg = f"Erro ao atualizar tarefa: {str(e)}"
-        logger.error(error_msg)
-        return error_msg
-
 @server.tool("batch_add_tasks")
 def batch_add_tasks(batch: BatchTaskAdd) -> Dict:
     """
@@ -410,12 +254,22 @@ def batch_add_tasks(batch: BatchTaskAdd) -> Dict:
                     data_criacao,
                     ""  # data_solucao vazia por padrão
                 ]
-                rows_to_add.append(row)
-                results.append({
-                    "task_id": task.task_id,
-                    "status": "success",
-                    "message": "Tarefa preparada para adição"
-                })
+                connector = get_connector()
+                task_x = connector.get_one(project_id=task.project, task_id=task.task_id)
+                if task_x.get('error', None):
+                    rows_to_add.append(row)
+                    results.append({
+                        "task_id": task.task_id,
+                        "status": "success",
+                        "message": "Tarefa preparada para adição"
+                    })
+                else:
+                    results.append({
+                        "task_id": getattr(task, 'task_id', 'unknown'),
+                        "status": "error",
+                        "message": f"Já existe task nesse projeto com o ID fornecido"
+                    })
+                    
             except Exception as e:
                 results.append({
                     "task_id": getattr(task, 'task_id', 'unknown'),

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MCP (Model Context Protocol) server for managing Kanban tasks using Google Sheets as a backend. The server provides tools to create, read, update, and filter tasks through the MCP protocol.
+MCP (Model Context Protocol) server for managing Kanban tasks using local files (Excel or CSV) as a backend. The server provides tools to create, read, update, and filter tasks through the MCP protocol.
 
 ## Code Style Guidelines
 
@@ -55,17 +55,18 @@ uv run pytest tests/test_list_tasks.py::test_list_tasks_all
 ### Core Components
 
 1. **[main.py](main.py)**: MCP server entry point using FastMCP
-   - Defines MCP tools: `get_one_task`, `list_tasks`, `add_task`, `update_task`, `batch_add_tasks`, `batch_update_tasks`, `get_valid_configs`
-   - Handles Google Sheets API authentication via service account
+   - Defines MCP tools: `get_one_or_more_tasks`, `list_tasks`, `batch_add_tasks`, `batch_update_tasks`, `get_valid_configs`
+   - Uses local file connector for Excel/CSV file access
    - All logging goes to stderr (never stdout) per MCP STDIO protocol requirements
-   - Uses singleton pattern for `PlanilhasConnector` instance via `get_connector()`
+   - Uses singleton pattern for `LocalFileConnector` instance via `get_connector()`
 
-2. **[utils/planilhas_connector.py](utils/planilhas_connector.py)**: Google Sheets connector with local caching
-   - Loads sheet data once into pandas DataFrame for fast queries
-   - Automatically reloads cache after add/update operations
-   - Handles all Google Sheets API interactions (get, add, update, batchUpdate)
+2. **[utils/local_file_connector.py](utils/local_file_connector.py)**: Local file connector with caching
+   - Loads file data once into pandas DataFrame for fast queries
+   - Automatically saves file after add/update operations
+   - Supports both Excel (.xlsx, .xls) and CSV (.csv) formats
    - Search/filter logic implemented using pandas operations for efficiency
    - Column names normalized (spaces -> hyphens) internally, converted back for output
+   - Creates file with proper structure if it doesn't exist
 
 3. **[models/](models/)**: Pydantic v2 models for type safety and validation
    - `task.py`: Core models (Task, TaskUpdate, TaskUpdateFields, BatchTaskAdd, BatchTaskUpdate, SearchFilters, PaginationParams, PaginatedResponse)
@@ -75,14 +76,14 @@ uv run pytest tests/test_list_tasks.py::test_list_tasks_all
    - Field validators convert string inputs to enums with helpful error messages
 
 4. **[tests/](tests/)**: Comprehensive pytest-based test suite
-   - Uses mocks for Google Sheets API to avoid real API calls
-   - Fixtures in `conftest.py` provide mock services, credentials, and sample data
+   - Uses mocks for file operations to avoid real file access
+   - Fixtures in `conftest.py` provide mock connector and sample data
    - `autouse` fixture resets connector between tests to avoid state pollution
    - Tests cover all MCP tools with various scenarios and edge cases
 
-### Google Sheets Integration
+### File Structure
 
-The server expects a Google Sheets spreadsheet with columns A-K:
+The server expects an Excel or CSV file with the following columns:
 
 | Column | Field Name     | Description                  |
 |--------|----------------|------------------------------|
@@ -101,11 +102,10 @@ The server expects a Google Sheets spreadsheet with columns A-K:
 ### Configuration
 
 Required environment variables in `.env`:
-- `KANBAN_SHEET_ID`: Google Sheets spreadsheet ID
-- `KANBAN_SHEET_NAME`: Sheet tab name (default: "Back-End")
+- `KANBAN_FILE_PATH`: Path to Excel (.xlsx) or CSV (.csv) file (default: "kanban.xlsx")
+- `KANBAN_SHEET_NAME`: Sheet tab name for Excel files (optional, default: first sheet)
 
-Required file:
-- `credentials.json`: Google Cloud Service Account credentials with Sheets API access
+The file will be created automatically with the proper structure if it doesn't exist.
 
 ### Key Architectural Patterns
 
@@ -114,19 +114,19 @@ Required file:
    - Field validation happens automatically at model level
    - Validators in `TaskUpdateFields` convert strings back to enums for validation
 
-2. **Cached DataFrame Pattern** ([utils/planilhas_connector.py](utils/planilhas_connector.py)):
-   - Load sheet once into pandas DataFrame in `__init__` via `__load_data()`
-   - All searches/filters use pandas operations (no API calls)
-   - After `add()` or `update_one()`, automatically call `__load_data()` to refresh cache
+2. **Cached DataFrame Pattern** ([utils/local_file_connector.py](utils/local_file_connector.py)):
+   - Load file once into pandas DataFrame in `__init__` via `__load_data()`
+   - All searches/filters use pandas operations (no file I/O)
+   - After `add()` or `update_one()`, automatically call `__save_data()` to persist changes
    - Column name normalization: spaces -> hyphens internally, converted back in output
 
-3. **Batch Operations**: Uses Google Sheets batchUpdate API
-   - `batch_add_tasks`: Collects all tasks, single `append()` call
-   - `batch_update_tasks`: Builds batch data array, single `batchUpdate()` call
+3. **Batch Operations**: Efficient batch processing
+   - `batch_add_tasks`: Collects all tasks, single file write operation
+   - `batch_update_tasks`: Builds batch updates, single file write operation
    - Returns detailed success/error status for each operation
 
 4. **Date Auto-filling**:
-   - `data_criacao`: Auto-generated in `add_task` and `batch_add_tasks`
+   - `data_criacao`: Auto-generated in `batch_add_tasks`
    - `data_solucao`: Auto-set when status changes to final state (Concluído, Cancelado, Não Relacionado)
 
 5. **Pagination Support**: Optional in `list_tasks`
@@ -134,34 +134,34 @@ Required file:
    - When not provided: returns simple list (backward compatibility)
    - Pagination applied after filtering, using list slicing
 
+6. **File Format Support**:
+   - Excel files (.xlsx, .xls): Uses openpyxl engine, supports multiple sheets
+   - CSV files (.csv): Standard CSV format with automatic encoding detection
+
 ## MCP Tools Quick Reference
 
-### get_one_task
-Get specific task by project and task_id. Required: `project`, `task_id`.
+### get_one_or_more_tasks
+Get one or more specific tasks by project and task_id list. Required: `project`, `task_id_list`.
 
 ### list_tasks
 Search/filter tasks. Filters: `prioridade` (Baixa/Normal/Alta/Urgente), `status` (Todo/Em Desenvolvimento/Impedido/Concluído/Cancelado/Não Relacionado/Pausado), `contexto`, `projeto`, `texto_busca`, `task_id`, `sprint`. Supports pagination.
 
-### add_task
-Add single task. Required: `project`, `task_id`, `contexto`, `descricao`, `prioridade`, `status`. Auto-generates `data_criacao`.
+### batch_add_tasks
+Add multiple tasks efficiently. Auto-generates `data_criacao` for each task.
 
-### update_task
-Update task by ID. Fields: `status`, `prioridade`, `contexto`, `descricao`, `detalhado`, `sprint`, `task_id_root`. Auto-sets `data_solucao` for final statuses.
-
-### batch_add_tasks / batch_update_tasks
-Add/update multiple tasks efficiently using single API call.
+### batch_update_tasks
+Update multiple tasks efficiently. Fields: `status`, `prioridade`, `contexto`, `descricao`, `detalhado`, `sprint`, `task_id_root`. Auto-sets `data_solucao` for final statuses.
 
 ### get_valid_configs
 Returns valid Status and Priority enum values.
 
 ## Testing Strategy
 
-Tests use mocks to avoid Google Sheets API calls. Key fixtures in `conftest.py`:
+Tests use mocks to avoid file I/O operations. Key fixtures in `conftest.py`:
 - `mock_env_vars`: Mocked environment variables
-- `mock_sheets_service`: Mock Google Sheets service with sample data
-- `mock_connector`: Pre-configured PlanilhasConnector with mocked service
-- `sample_sheet_data`: Standard test data (3 tasks)
-- `empty_sheet_data`: Empty sheet for edge case testing
+- `mock_connector`: Pre-configured LocalFileConnector with mocked file operations
+- `sample_data`: Standard test data (3 tasks)
+- `empty_data`: Empty dataset for edge case testing
 - `reset_connector_cache`: Autouse fixture to reset singleton between tests
 
 When adding new features, ensure tests cover:
@@ -169,13 +169,16 @@ When adding new features, ensure tests cover:
 - Validation errors for invalid inputs
 - Edge cases (empty results, missing tasks, etc.)
 - Batch operations with partial failures
+- Both Excel and CSV file formats
 
 ## Important Implementation Notes
 
 1. **Connector Singleton**: [main.py](main.py) uses global `_connector` variable with `get_connector()` factory. Use `reset_connector()` in tests to clear state.
 
-2. **Field Name Mapping**: [main.py](main.py) tools use field mapping dicts (e.g., `field_to_header`) to convert Pydantic field names to Google Sheets column headers.
+2. **Field Name Mapping**: [main.py](main.py) tools use field mapping dicts (e.g., `field_to_header`) to convert Pydantic field names to file column headers.
 
-3. **MCP STDIO Protocol**: Never write to stdout (reserved for MCP protocol). All logs go to stderr via logging configuration in [main.py:23-28](main.py#L23-L28).
+3. **MCP STDIO Protocol**: Never write to stdout (reserved for MCP protocol). All logs go to stderr via logging configuration in [main.py:22-25](main.py#L22-L25).
 
 4. **Enum Validation**: [models/task.py](models/task.py) `TaskUpdateFields` has custom validators to convert strings to enums with clear error messages showing valid values.
+
+5. **File Auto-creation**: If the specified file doesn't exist, it will be created automatically with the proper column structure.

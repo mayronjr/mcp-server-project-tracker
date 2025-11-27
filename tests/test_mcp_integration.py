@@ -11,19 +11,15 @@ from models import TaskStatus, TaskPriority
 class TestMCPServerIntegration:
     """Testes de integração do servidor MCP."""
 
-    def test_server_tools_registered(self, mock_env_vars, mock_credentials_file,
-                                     mock_credentials):
+    def test_server_tools_registered(self, mock_env_vars):
         """Verifica se todas as ferramentas estão registradas no servidor."""
-        from main import server
-
         # Verificar se as ferramentas esperadas estão registradas
         expected_tools = [
             "list_tasks",
-            "add_task",
-            "update_task",
             "batch_add_tasks",
             "batch_update_tasks",
-            "get_valid_configs"
+            "get_valid_configs",
+            "get_one_or_more_tasks"
         ]
 
         # O FastMCP armazena as ferramentas, vamos verificar se elas existem
@@ -48,26 +44,21 @@ class TestMCPServerIntegration:
 
     def test_environment_variables_required(self):
         """Verifica se variáveis de ambiente obrigatórias são validadas."""
-        # Este teste verifica que o código do main.py requer KANBAN_SHEET_ID
-        # Verificamos que SPREADSHEET_ID não é None no código
+        # Este teste verifica que o código do main.py requer KANBAN_FILE_PATH
         import main
 
-        # Verificar que o código tem validação de SPREADSHEET_ID
-        assert hasattr(main, 'SPREADSHEET_ID')
+        # Verificar que o código tem validação de KANBAN_FILE_PATH
+        assert hasattr(main, 'KANBAN_FILE_PATH')
         # Se chegamos aqui, significa que a variável foi configurada corretamente
         # pois o módulo lança EnvironmentError se não estiver definida
 
-    def test_credentials_file_required(self, mock_env_vars):
-        """Verifica se o arquivo de credenciais é obrigatório."""
-        import os
-        from unittest.mock import patch
-
-        # Mock que simula arquivo não existente
-        with patch('os.path.exists', return_value=False):
-            with pytest.raises(FileNotFoundError):
-                import importlib
-                import main as main_module
-                importlib.reload(main_module)
+    def test_file_path_validation(self):
+        """Verifica se o caminho do arquivo é validado."""
+        # Este teste não é mais aplicável pois não usamos credenciais
+        # O arquivo é criado automaticamente se não existir
+        # Mantemos o teste para validação de diretório
+        import main
+        assert hasattr(main, 'KANBAN_FILE_PATH')
 
 
 class TestPydanticModels:

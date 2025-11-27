@@ -13,8 +13,7 @@ from models import (
 class TestBatchAddTasks:
     """Testes para batch_add_tasks."""
 
-    def test_batch_add_single_task(self, mock_env_vars, mock_credentials_file,
-                                   mock_credentials, mock_get_sheets_service):
+    def test_batch_add_single_task(self, mock_env_vars, mock_connector):
         """Testa adição em lote de uma única tarefa."""
         task = Task(
             project="TestProject",
@@ -37,8 +36,7 @@ class TestBatchAddTasks:
         assert len(result["details"]) == 1
         assert result["details"][0]["status"] == "success"
 
-    def test_batch_add_multiple_tasks(self, mock_env_vars, mock_credentials_file,
-                                      mock_credentials, mock_get_sheets_service):
+    def test_batch_add_multiple_tasks(self, mock_env_vars, mock_connector):
         """Testa adição em lote de múltiplas tarefas."""
         tasks = []
         for i in range(5):
@@ -63,8 +61,7 @@ class TestBatchAddTasks:
         assert result["error_count"] == 0
         assert len(result["details"]) == 5
 
-    def test_batch_add_mixed_priorities(self, mock_env_vars, mock_credentials_file,
-                                        mock_credentials, mock_get_sheets_service):
+    def test_batch_add_mixed_priorities(self, mock_env_vars, mock_connector):
         """Testa adição de tarefas com diferentes prioridades."""
         priorities = [TaskPriority.BAIXA, TaskPriority.NORMAL,
                      TaskPriority.ALTA, TaskPriority.URGENTE]
@@ -90,13 +87,10 @@ class TestBatchAddTasks:
         assert result["success_count"] == 4
         assert result["error_count"] == 0
 
-    def test_batch_add_api_error(self, mock_env_vars, mock_credentials_file,
-                                 mock_credentials, mock_sheets_service):
+    def test_batch_add_api_error(self, mock_env_vars, mock_connector):
         """Testa tratamento de erro na API."""
-        mock_sheets_service.spreadsheets().values().append().execute.side_effect = \
-            Exception("Erro de API")
-
-        with patch('main.get_sheets_service', return_value=mock_sheets_service):
+        # Simular erro ao adicionar tarefa
+        with patch.object(mock_connector, 'add', return_value={"error": "Erro de API"}):
             task = Task(
                 project="TestProject",
                 task_id="TASK-ERROR",
@@ -118,8 +112,7 @@ class TestBatchAddTasks:
 class TestBatchUpdateTasks:
     """Testes para batch_update_tasks."""
 
-    def test_batch_update_single_task(self, mock_env_vars, mock_credentials_file,
-                                      mock_credentials, mock_connector):
+    def test_batch_update_single_task(self, mock_env_vars, mock_connector):
         """Testa atualização em lote de uma única tarefa."""
         updates = [
             TaskUpdate(
@@ -138,8 +131,7 @@ class TestBatchUpdateTasks:
         assert len(result["details"]) == 1
         assert result["details"][0]["status"] == "success"
 
-    def test_batch_update_multiple_tasks(self, mock_env_vars, mock_credentials_file,
-                                         mock_credentials, mock_connector):
+    def test_batch_update_multiple_tasks(self, mock_env_vars, mock_connector):
         """Testa atualização em lote de múltiplas tarefas."""
         updates = [
             TaskUpdate(project="TestProject", task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
@@ -155,8 +147,7 @@ class TestBatchUpdateTasks:
         assert result["error_count"] == 0
         assert len(result["details"]) == 3
 
-    def test_batch_update_task_not_found(self, mock_env_vars, mock_credentials_file,
-                                        mock_credentials, mock_connector):
+    def test_batch_update_task_not_found(self, mock_env_vars, mock_connector):
         """Testa atualização de tarefa inexistente."""
         updates = [
             TaskUpdate(project="TestProject", task_id="TASK-999", fields=TaskUpdateFields(status="Concluído"))
@@ -171,8 +162,7 @@ class TestBatchUpdateTasks:
         assert result["details"][0]["status"] == "error"
         assert "não encontrada" in result["details"][0]["message"].lower()
 
-    def test_batch_update_invalid_status(self, mock_env_vars, mock_credentials_file,
-                                        mock_credentials, mock_connector):
+    def test_batch_update_invalid_status(self, mock_env_vars, mock_connector):
         """Testa atualização com status inválido."""
         # Com Pydantic, status inválido gerará um ValidationError
         with pytest.raises(Exception):  # Pydantic ValidationError
@@ -180,8 +170,7 @@ class TestBatchUpdateTasks:
                 TaskUpdate(project="TestProject", task_id="TASK-001", fields=TaskUpdateFields(status="StatusInvalido"))
             ]
 
-    def test_batch_update_invalid_priority(self, mock_env_vars, mock_credentials_file,
-                                          mock_credentials, mock_connector):
+    def test_batch_update_invalid_priority(self, mock_env_vars, mock_connector):
         """Testa atualização com prioridade inválida."""
         # Com Pydantic, prioridade inválida gerará um ValidationError
         with pytest.raises(Exception):  # Pydantic ValidationError
@@ -189,8 +178,7 @@ class TestBatchUpdateTasks:
                 TaskUpdate(project="TestProject", task_id="TASK-001", fields=TaskUpdateFields(prioridade="PrioridadeInvalida"))
             ]
 
-    def test_batch_update_mixed_success_error(self, mock_env_vars, mock_credentials_file,
-                                              mock_credentials, mock_connector):
+    def test_batch_update_mixed_success_error(self, mock_env_vars, mock_connector):
         """Testa atualização em lote com sucesso e erros mistos."""
         updates = [
             TaskUpdate(project="TestProject", task_id="TASK-001", fields=TaskUpdateFields(status="Concluído")),
@@ -205,8 +193,7 @@ class TestBatchUpdateTasks:
         assert result["success_count"] == 2
         assert result["error_count"] == 1
 
-    def test_batch_update_multiple_fields(self, mock_env_vars, mock_credentials_file,
-                                         mock_credentials, mock_connector):
+    def test_batch_update_multiple_fields(self, mock_env_vars, mock_connector):
         """Testa atualização de múltiplos campos (data_solucao é definida automaticamente)."""
         updates = [
             TaskUpdate(
@@ -230,8 +217,7 @@ class TestBatchUpdateTasks:
 class TestGetValidConfigs:
     """Testes para get_valid_configs."""
 
-    def test_get_valid_configs_structure(self, mock_env_vars, mock_credentials_file,
-                                         mock_credentials):
+    def test_get_valid_configs_structure(self, mock_env_vars):
         """Testa estrutura do retorno."""
         result = get_valid_configs()
 
@@ -239,16 +225,14 @@ class TestGetValidConfigs:
         assert "valid_task_status" in result
         assert "valid_task_priorities" in result
 
-    def test_get_valid_configs_status_values(self, mock_env_vars, mock_credentials_file,
-                                            mock_credentials):
+    def test_get_valid_configs_status_values(self, mock_env_vars):
         """Testa valores de status válidos."""
         result = get_valid_configs()
 
         expected_status = ["Todo", "Em Desenvolvimento", "Impedido", "Concluído", "Cancelado", "Não Relacionado", "Pausado"]
         assert result["valid_task_status"] == expected_status
 
-    def test_get_valid_configs_priority_values(self, mock_env_vars, mock_credentials_file,
-                                              mock_credentials):
+    def test_get_valid_configs_priority_values(self, mock_env_vars):
         """Testa valores de prioridade válidos."""
         result = get_valid_configs()
 

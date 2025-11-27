@@ -1,69 +1,98 @@
 import math
-from typing import Any, Dict, List, Optional, Union
+import os
+from typing import Dict, List, Optional, Union
+import pandas as pd
 from pandas import DataFrame
 
 
-class PlanilhasConnector:
+class LocalFileConnector:
     """
-    Connector para Google Sheets com cache local usando pandas DataFrame.
+    Connector para arquivos locais (Excel ou CSV) com cache local usando pandas DataFrame.
 
-    Carrega os dados da planilha uma vez e mantém em memória para consultas rápidas.
-    Recarrega automaticamente após operações de add/update.
+    Carrega os dados do arquivo uma vez e mantém em memória para consultas rápidas.
+    Salva automaticamente após operações de add/update.
 
     Estrutura esperada das colunas:
     Nome Projeto | Task ID | Task ID Root | Sprint | Contexto | Descrição |
     Detalhado | Prioridade | Status | Data Criação | Data Solução
     """
 
-    service: Any
-    spreadsheetId: str
-    range: str
+    file_path: str
+    file_type: str  # 'excel' ou 'csv'
     df: DataFrame
-    sheet_name: str
+    sheet_name: Optional[str]  # Usado apenas para Excel
 
-    def __init__(self, service: Any, spreadsheetId: str, range: str) -> None:
+    def __init__(self, file_path: str, sheet_name: Optional[str] = None) -> None:
         """
-        Inicializa o connector e carrega os dados da planilha.
+        Inicializa o connector e carrega os dados do arquivo.
 
         Args:
-            service: Serviço autenticado do Google Sheets API
-            spreadsheetId: ID da planilha do Google Sheets
-            range: Range no formato "SheetName!A:K"
+            file_path: Caminho para o arquivo Excel (.xlsx) ou CSV (.csv)
+            sheet_name: Nome da aba (apenas para Excel, padrão: primeira aba)
         """
-        self.service = service
-        self.spreadsheetId = spreadsheetId
-        self.range = range
-        # Extrair nome da aba do range (ex: "Back-End!A:K" -> "Back-End")
-        self.sheet_name = range.split('!')[0] if '!' in range else 'Sheet1'
+        self.file_path = file_path
+        self.sheet_name = sheet_name
+
+        # Determinar tipo de arquivo
+        if file_path.endswith('.xlsx') or file_path.endswith('.xls'):
+            self.file_type = 'excel'
+        elif file_path.endswith('.csv'):
+            self.file_type = 'csv'
+        else:
+            raise ValueError("Formato de arquivo não suportado. Use .xlsx, .xls ou .csv")
 
         self.__load_data()
 
     def __load_data(self) -> None:
-        """Carrega dados da planilha remota para o DataFrame local."""
-        sheet = self.service.spreadsheets()
-        result: dict = (
-            sheet.values()
-            .get(spreadsheetId=self.spreadsheetId, range=self.range)
-            .execute()
-        )
-        values: list = result.get('values', [])
-
-        if not values:
-            # Planilha vazia - criar DataFrame vazio com colunas esperadas
+        """Carrega dados do arquivo local para o DataFrame."""
+        # Verificar se o arquivo existe
+        if not os.path.exists(self.file_path):
+            # Criar arquivo vazio com estrutura esperada
             self.df = DataFrame(columns=[
                 'Nome-Projeto', 'Task-ID', 'Task-ID-Root', 'Sprint', 'Contexto',
                 'Descrição', 'Detalhado', 'Prioridade', 'Status',
                 'Data-Criação', 'Data-Solução'
             ])
+            self.__save_data()
             return
 
-        header: list = values.pop(0)
-        # Normalizar nomes das colunas: substituir espaços por hífens
-        normalized_columns = {
-            i: header[i].replace(' ', '-')
-            for i in range(len(header))
-        }
-        self.df = DataFrame(values).rename(columns=normalized_columns)
+        # Carregar arquivo existente
+        try:
+            if self.file_type == 'excel':
+                # Ler arquivo Excel
+                df = pd.read_excel(self.file_path, sheet_name=self.sheet_name or 0)
+            else:  # CSV
+                # Ler arquivo CSV
+                df = pd.read_csv(self.file_path)
+
+            # Normalizar nomes das colunas: substituir espaços por hífens
+            df.columns = [col.replace(' ', '-') for col in df.columns]
+            self.df = df
+
+        except Exception as e:
+            raise RuntimeError(f"Erro ao carregar arquivo {self.file_path}: {str(e)}")
+
+    def __save_data(self) -> None:
+        """Salva o DataFrame de volta ao arquivo."""
+        try:
+            # Converter nomes de colunas de volta para formato com espaços
+            df_to_save = self.df.copy()
+            df_to_save.columns = [col.replace('-', ' ') for col in df_to_save.columns]
+
+            if self.file_type == 'excel':
+                # Salvar como Excel
+                with pd.ExcelWriter(self.file_path, engine='openpyxl', mode='w') as writer:
+                    df_to_save.to_excel(
+                        writer,
+                        sheet_name=self.sheet_name or 'Sheet1',
+                        index=False
+                    )
+            else:  # CSV
+                # Salvar como CSV
+                df_to_save.to_csv(self.file_path, index=False)
+
+        except Exception as e:
+            raise RuntimeError(f"Erro ao salvar arquivo {self.file_path}: {str(e)}")
 
     def get_one(self, project_id: str, task_id: str) -> Dict:
         """
@@ -213,7 +242,7 @@ class PlanilhasConnector:
 
     def add(self, new_task_list: List[List]) -> Dict:
         """
-        Adiciona novas tarefas na planilha remota e recarrega o cache.
+        Adiciona novas tarefas ao arquivo local e recarrega o cache.
 
         Args:
             new_task_list: Lista de listas com valores das tarefas.
@@ -228,18 +257,18 @@ class PlanilhasConnector:
             if not new_task_list:
                 return {"error": "Lista de tarefas vazia"}
 
-            sheet = self.service.spreadsheets()
-            body = {"values": new_task_list}
+            # Criar DataFrame com novas tarefas
+            new_df = DataFrame(new_task_list, columns=[
+                'Nome-Projeto', 'Task-ID', 'Task-ID-Root', 'Sprint', 'Contexto',
+                'Descrição', 'Detalhado', 'Prioridade', 'Status',
+                'Data-Criação', 'Data-Solução'
+            ])
 
-            sheet.values().append(
-                spreadsheetId=self.spreadsheetId,
-                range=self.range,
-                valueInputOption="RAW",
-                body=body
-            ).execute()
+            # Adicionar ao DataFrame existente
+            self.df = pd.concat([self.df, new_df], ignore_index=True)
 
-            # Recarregar dados
-            self.__load_data()
+            # Salvar no arquivo
+            self.__save_data()
 
             return {
                 "success": True,
@@ -251,7 +280,7 @@ class PlanilhasConnector:
 
     def update_one(self, update_task_list: List[Dict]) -> Dict:
         """
-        Atualiza tarefas na planilha remota e recarrega o cache.
+        Atualiza tarefas no arquivo local e salva.
 
         Args:
             update_task_list: Lista de dicionários com:
@@ -266,20 +295,6 @@ class PlanilhasConnector:
             if not update_task_list:
                 return {"error": "Lista de atualizações vazia"}
 
-            sheet = self.service.spreadsheets()
-
-            # Buscar dados atuais da planilha
-            result = sheet.values().get(
-                spreadsheetId=self.spreadsheetId,
-                range=self.range
-            ).execute()
-            values = result.get("values", [])
-
-            if not values or len(values) < 2:
-                return {"error": "Nenhuma tarefa encontrada na planilha"}
-
-            headers = values[0]
-            batch_data = []
             results = []
             success_count = 0
             error_count = 0
@@ -309,55 +324,36 @@ class PlanilhasConnector:
                     })
                     continue
 
-                # Encontrar a tarefa (Nome Projeto está no índice 0, Task ID está no índice 1)
-                task_found = False
-                for i, row in enumerate(values[1:], start=2):
-                    # Garantir que row tem comprimento suficiente
-                    extended_row = row + [''] * (len(headers) - len(row))
+                # Encontrar a tarefa no DataFrame
+                mask = (self.df['Nome-Projeto'] == project) & (self.df['Task-ID'] == task_id)
+                task_indices = self.df.index[mask].tolist()
 
-                    if len(extended_row) > 1 and extended_row[0] == project and extended_row[1] == task_id:
-                        task_found = True
-
-                        # Atualizar campos
-                        for key, value in updates.items():
-                            if key in headers:
-                                idx = headers.index(key)
-                                extended_row[idx] = value
-
-                        # Adicionar ao batch
-                        batch_data.append({
-                            "range": f"{self.sheet_name}!A{i}:K{i}",
-                            "values": [extended_row]
-                        })
-                        success_count += 1
-                        results.append({
-                            "task_id": task_id,
-                            "status": "success",
-                            "message": "Tarefa atualizada com sucesso"
-                        })
-                        break
-
-                if not task_found:
+                if not task_indices:
                     error_count += 1
                     results.append({
                         "task_id": task_id,
                         "status": "error",
                         "message": f"Tarefa '{task_id}' não encontrada no projeto '{project}'"
                     })
+                    continue
 
-            # Executar batch update se houver atualizações
-            if batch_data:
-                batch_body = {
-                    "valueInputOption": "RAW",
-                    "data": batch_data
-                }
-                sheet.values().batchUpdate(
-                    spreadsheetId=self.spreadsheetId,
-                    body=batch_body
-                ).execute()
+                # Atualizar campos (converter nomes com espaços para hífens)
+                idx = task_indices[0]
+                for key, value in updates.items():
+                    col_name = key.replace(' ', '-')
+                    if col_name in self.df.columns:
+                        self.df.at[idx, col_name] = value
 
-                # Recarregar dados
-                self.__load_data()
+                success_count += 1
+                results.append({
+                    "task_id": task_id,
+                    "status": "success",
+                    "message": "Tarefa atualizada com sucesso"
+                })
+
+            # Salvar alterações se houve atualizações
+            if success_count > 0:
+                self.__save_data()
 
             return {
                 "success_count": success_count,
