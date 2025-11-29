@@ -11,6 +11,14 @@ Servidor MCP (Model Context Protocol) para gerenciamento de tarefas em um quadro
 - **Paginação**: Suporte completo para navegação paginada de resultados
 - **Protocolo MCP**: Compatível com clientes MCP via STDIO
 
+## Configuração
+
+### Claude
+
+Executar o seguinte comando na pasta do projeto:
+
+`claude mcp add --transport stdio kanban-sheets -- uv run -- --directory "caminho\projeto\sua\maquina" python main.py`
+
 ## Ferramentas Disponíveis
 
 ### 1. `get_one_task` - Buscar Tarefa Específica
